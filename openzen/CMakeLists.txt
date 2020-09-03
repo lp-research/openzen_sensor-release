@@ -7,7 +7,7 @@ option(ZEN_MSVC_RUNTIME_STATIC "Link the MSVC runtime statically, useful for lib
 if (MSVC)
     # make sure we link with the static runtime libraries
     # and have no dependencies on VC++ studio DLLs during runtime
-    # We don't have any C++ exposed, so the C++ compatiblity
+    # We don't have any C++ exposed, so the C++ compatibility
     # to the host program of the DLL is not required
 
     # according to
@@ -32,18 +32,39 @@ if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
     message(FATAL_ERROR "GCC Version 7.0 is at least need to compile OpenZen")
 endif()
 
+set (ZEN_BLUETOOTH_DEFAULT ON)
+
+## check if libbluetooth is available on non-Apple Unix
+if(UNIX AND NOT APPLE)
+    find_library(LIBBLUETOOTH_LIBRARY
+        NAMES bluetooth)
+
+    if (NOT LIBBLUETOOTH_LIBRARY)
+        set(ZEN_BLUETOOTH_DEFAULT OFF)
+
+        message("Please install libbluetooth-dev for bluetooth support")
+        if (ZEN_BLUETOOTH)
+            # give a fatal error message if Bluetooth support was requested
+            # by cmake parameters but we cannot fullfil it
+            message(FATAL_ERROR "libbluetooth-dev required to compile with Bluetooth support")
+        endif()
+    endif()
+endif()
+
 # Please note: The static OpenZen build does not support library installation (aka "make install")
 # as the private dependencies cannot be resolved by CMake
 # see https://gitlab.kitware.com/cmake/cmake/issues/17357 for example
 option(ZEN_USE_STATIC_LIBS "Whether to compile OpenZen as a static library" OFF)
 option(ZEN_STATIC_LINK_LIBCXX "Option to statically link libstdc++ to be portable to older systems (Linux only)" OFF)
-option(ZEN_BLUETOOTH "Compile OpenZen with bluetooth support" ON)
+# linux needs libbluetooth-dev to be able to compile, so disable it by default
+option(ZEN_BLUETOOTH "Compile OpenZen with bluetooth support" ${ZEN_BLUETOOTH_DEFAULT})
+option(ZEN_BLUETOOTH_BLE "Compile OpenZen with bluetooth low-energy support, needs Qt installed" OFF)
 option(ZEN_NETWORK "Compile OpenZen with support for network streaming of measurement data" OFF)
 option(ZEN_CSHARP "Compile C# bindings for OpenZen" ON)
 option(ZEN_PYTHON "Compile Python bindings for OpenZen" OFF)
 option(ZEN_TESTS "Compile with OpenZen tests" ON)
 option(ZEN_EXAMPLES "Compile with OpenZen examples" ON)
-
+option(ZEN_USE_BINARY_LIBRARIES "If set to true, binaries libraries are downloaded during the build" ON)
 
 # Enable this line and set it to the correct Qt installation path if you want to compile
 # with bluetooth support on Windows
@@ -70,7 +91,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     )
 endif()
 
-if (ZEN_BLUETOOTH)
+if (ZEN_BLUETOOTH_BLE)
     # Instruct CMake to run moc automatically when needed
     set(CMAKE_AUTOMOC ON)
     find_package(Qt5Bluetooth REQUIRED)
@@ -106,7 +127,7 @@ set(zen_sources
 if(ZEN_CSHARP)
     list (APPEND zen_sources
         ## run
-        # swig.exe -csharp -small -c++ -debug-typedef -DSWIGWORDSIZE64 -o OpenZenCSharp/OpenZen_wrap_csharp.cxx -outdir OpenZenCSharp OpenZen.i
+        # swig.exe -csharp -small -c++ -debug-typedef -o OpenZenCSharp/OpenZen_wrap_csharp.cxx -outdir OpenZenCSharp OpenZen.i
         # in the bindings folder to generate
         bindings/OpenZenCSharp/OpenZen_wrap_csharp.cxx
     )
@@ -114,15 +135,15 @@ endif()
 
 if(ZEN_PYTHON)
     # this is only available in cmake 3.12 or newer
-    # libOpenZen.so needs to be renamed to _OpenZen.so so the python module can find it.
-    find_package (Python COMPONENTS Development)
+    # look and build only for python3
+    find_package (Python3 REQUIRED COMPONENTS Development)
     list (APPEND zen_sources
         ## run
-        # swig.exe -python -small -c++ -debug-typedef -DSWIGWORDSIZE64 -o OpenZenPython/OpenZen_wrap_python.cxx -outdir OpenZenPython OpenZen.i
+        # swig.exe -python -small -c++ -debug-typedef -o OpenZenPython/OpenZen_wrap_python.cxx -outdir OpenZenPython OpenZen.i
         # in the bindings folder to generate
         bindings/OpenZenPython/OpenZen_wrap_python.cxx
     )
-    list (APPEND zen_optional_libs Python::Python)
+    list (APPEND zen_optional_libs Python3::Python)
 endif()
 
 set(zen_optional_test_sources)
@@ -178,15 +199,11 @@ set(io_can_sources
 set(io_interfaces_sources
     src/io/interfaces/CanInterface.cpp
     src/io/interfaces/CanInterface.h
-    src/io/interfaces/FtdiUsbInterface.cpp
-    src/io/interfaces/FtdiUsbInterface.h
     src/io/interfaces/TestSensorInterface.cpp
     src/io/interfaces/TestSensorInterface.h
 )
 
 set(io_systems_sources
-    src/io/systems/FtdiUsbSystem.cpp
-    src/io/systems/FtdiUsbSystem.h
     src/io/systems/TestSensorSystem.cpp
     src/io/systems/TestSensorSystem.h
 )
@@ -226,7 +243,7 @@ set(utility_sources
     src/utility/gnss/RTCM3Parser.h
 )
 
-if(ZEN_BLUETOOTH)
+if(ZEN_BLUETOOTH_BLE)
     set(io_ble_sources
         src/io/ble/BleDeviceFinder.cpp
         src/io/ble/BleDeviceFinder.h
@@ -234,25 +251,14 @@ if(ZEN_BLUETOOTH)
         src/io/ble/BleDeviceHandler.h
     )
 
-    set(io_bluetooth_sources
-        src/io/bluetooth/BluetoothDeviceFinder.cpp
-        src/io/bluetooth/BluetoothDeviceFinder.h
-        src/io/bluetooth/BluetoothDeviceHandler.cpp
-        src/io/bluetooth/BluetoothDeviceHandler.h
-    )
-
     list (APPEND io_systems_sources
         src/io/systems/BleSystem.cpp
         src/io/systems/BleSystem.h
-        src/io/systems/BluetoothSystem.cpp
-        src/io/systems/BluetoothSystem.h
     )
 
     list (APPEND io_interfaces_sources
         src/io/interfaces/BleInterface.cpp
         src/io/interfaces/BleInterface.h
-        src/io/interfaces/BluetoothInterface.cpp
-        src/io/interfaces/BluetoothInterface.h
     )
 
     list (APPEND zen_optional_libs
@@ -260,12 +266,78 @@ if(ZEN_BLUETOOTH)
     )
 
     list (APPEND zen_optional_compile_definitions_private
-        ZEN_BLUETOOTH
+        ZEN_BLUETOOTH_BLE
+    )
+endif()
+
+if(ZEN_BLUETOOTH)
+    set(io_bluetooth_sources
+        src/utility/bluetooth-serial-port/BluetoothException.h
+        src/utility/bluetooth-serial-port/BTSerialPortBinding.h
+        src/utility/bluetooth-serial-port/DeviceINQ.h
+        src/utility/bluetooth-serial-port/Enums.h
+        src/utility/bluetooth-serial-port/Enums.cc
+        src/io/bluetooth/BluetoothDeviceFinder.cpp
+        src/io/bluetooth/BluetoothDeviceFinder.h
+        src/io/bluetooth/BluetoothDeviceHandler.cpp
+        src/io/bluetooth/BluetoothDeviceHandler.h
     )
 
-else()
-    set(io_ble_sources)
-    set(io_bluetooth_sources)
+    if(WIN32) # windows
+        list (APPEND io_bluetooth_sources
+            src/utility/bluetooth-serial-port/windows/BluetoothHelpers.cc
+            src/utility/bluetooth-serial-port/windows/BTSerialPortBinding.cc
+            src/utility/bluetooth-serial-port/windows/DeviceINQ.cc
+        )
+
+        list (APPEND zen_optional_libs
+            ws2_32
+            bthprops
+        )
+    elseif(APPLE) # MacOSX
+        list (APPEND io_bluetooth_sources
+            src/utility/bluetooth-serial-port/osx/BluetoothDeviceResources.mm
+            src/utility/bluetooth-serial-port/osx/BluetoothWorker.mm
+            src/utility/bluetooth-serial-port/osx/BTSerialPortBinding.mm
+            src/utility/bluetooth-serial-port/osx/DeviceINQ.mm
+            src/utility/bluetooth-serial-port/osx/pipe.c
+        )
+        find_library(FOUNDATION Foundation)
+        find_library(IOBLUETOOTH IOBluetooth)
+        list (APPEND zen_optional_libs
+            ${FOUNDATION}
+            ${IOBLUETOOTH}
+            -fobjc-arc
+        )
+
+        add_executable(btScan src/utility/bluetooth-serial-port/osx/btScan.mm)
+        target_link_libraries(btScan ${FOUNDATION} ${IOBLUETOOTH})
+        # Use a non-ancient C++ version for compilation ...
+        target_compile_features(btScan PRIVATE cxx_variadic_templates)
+    else() # Linux
+        list (APPEND io_bluetooth_sources
+            src/utility/bluetooth-serial-port/linux/BTSerialPortBinding.cc
+            src/utility/bluetooth-serial-port/linux/DeviceINQ.cc
+        )
+
+        list (APPEND zen_optional_libs
+            bluetooth
+        )
+    endif()
+
+    list (APPEND io_systems_sources
+        src/io/systems/BluetoothSystem.cpp
+        src/io/systems/BluetoothSystem.h
+    )
+
+    list (APPEND io_interfaces_sources
+        src/io/interfaces/BluetoothInterface.cpp
+        src/io/interfaces/BluetoothInterface.h
+    )
+
+    list (APPEND zen_optional_compile_definitions_private
+        ZEN_BLUETOOTH
+    )
 endif()
 
 if(ZEN_NETWORK)
@@ -303,22 +375,12 @@ endif()
 
 if(WIN32)
 
-    set(io_can_sources ${io_can_sources}
-        src/io/can/PcanBasicChannel.cpp
-        src/io/can/PcanBasicChannel.h
-    )
     set(io_interfaces_sources ${io_interfaces_sources}
-        src/io/interfaces/SiUsbInterface.cpp
-        src/io/interfaces/SiUsbInterface.h
         src/io/interfaces/windows/WindowsDeviceInterface.cpp
         src/io/interfaces/windows/WindowsDeviceInterface.h
     )
 
     set(io_systems_sources ${io_systems_sources}
-        src/io/systems/PcanBasicSystem.cpp
-        src/io/systems/PcanBasicSystem.h
-        src/io/systems/SiUsbSystem.cpp
-        src/io/systems/SiUsbSystem.h
         src/io/systems/windows/EnumerateSerialPorts.cpp
         src/io/systems/windows/EnumerateSerialPorts.h
         src/io/systems/windows/WindowsDeviceSystem.cpp
@@ -331,6 +393,34 @@ if(WIN32)
         src/utility/windows/WindowsDll.cpp
         src/utility/windows/WindowsDll.h
     )
+
+    # add drivers which need binary libraries
+    if (ZEN_USE_BINARY_LIBRARIES)
+        set(io_can_sources ${io_can_sources}
+            src/io/can/PcanBasicChannel.cpp
+            src/io/can/PcanBasicChannel.h
+        )
+
+        list (APPEND io_interfaces_sources
+            src/io/interfaces/SiUsbInterface.cpp
+            src/io/interfaces/SiUsbInterface.h
+            src/io/interfaces/FtdiUsbInterface.cpp
+            src/io/interfaces/FtdiUsbInterface.h
+        )
+
+        list (APPEND io_systems_sources
+            src/io/systems/PcanBasicSystem.cpp
+            src/io/systems/PcanBasicSystem.h
+            src/io/systems/SiUsbSystem.cpp
+            src/io/systems/SiUsbSystem.h
+            src/io/systems/FtdiUsbSystem.cpp
+            src/io/systems/FtdiUsbSystem.h
+        )
+
+        list (APPEND zen_optional_compile_definitions_private
+            ZEN_USE_BINARY_LIBRARIES
+        )
+    endif()
 
 elseif(UNIX AND NOT APPLE)
 
@@ -421,11 +511,6 @@ if (MSVC)
         PRIVATE
             /W4
     )
-
-    # this line will only work in CMake => 3.15
-    # https://cmake.org/cmake/help/v3.15/policy/CMP0091.html#policy:CMP0091
-    set_property(TARGET OpenZen PROPERTY
-        MSVC_RUNTIME_LIBRARY "MultiThriaeeaded$<$<CONFIG:Debug>:Debug>")
 else()
     target_compile_options(OpenZen
         PRIVATE
@@ -449,14 +534,19 @@ set(zen_include_dirs_public
 
 set(zen_include_dirs_private
         ${CMAKE_CURRENT_SOURCE_DIR}/src
-        $<TARGET_PROPERTY:ftdi,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:GSL,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:openzen_asio,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:cereal,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:nonstd::expected-lite,INTERFACE_INCLUDE_DIRECTORIES>
+)
+
+if (ZEN_USE_BINARY_LIBRARIES)
+    set(zen_include_dirs_private ${zen_include_dirs_private}
         $<$<PLATFORM_ID:Windows>:$<TARGET_PROPERTY:pcanbasic,INTERFACE_INCLUDE_DIRECTORIES>>
         $<$<PLATFORM_ID:Windows>:$<TARGET_PROPERTY:siusb,INTERFACE_INCLUDE_DIRECTORIES>>
-)
+        $<$<PLATFORM_ID:Windows>:$<TARGET_PROPERTY:ftdi,INTERFACE_INCLUDE_DIRECTORIES>>
+    )
+endif()
 
 target_include_directories(OpenZen
     PUBLIC
@@ -482,6 +572,32 @@ target_link_libraries(OpenZen
         ${zen_libs}
 )
 
+# copy library to a name with underscore to conform with python naming conventions
+# http://www.swig.org/Doc1.3/Python.html#Python_nn7
+#message(FATAL_ERROR "Will copy from $<TARGET_FILE:OpenZen> to ${CMAKE_CURRENT_BINARY_DIR}/lib/_OpenZen.pyd")
+#message(FATAL_ERROR "Will ${ZEN_PYTHON} and ${WIN32}")
+
+if (ZEN_PYTHON)
+    if(WIN32)
+        # rename file to be used as python module in Windows
+        #message(FATAL_ERROR "Will copy from ${<TARGET_FILE:OpenZen>} to ${CMAKE_CURRENT_BINARY_DIR}/lib/_OpenZen.pyd")
+        add_custom_command(TARGET OpenZen POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenZen> ${CMAKE_CURRENT_BINARY_DIR}/_OpenZen.pyd
+        )
+    endif()
+
+    if(UNIX)
+        # rename file to be used as python module in Linux/Max
+        add_custom_command(TARGET OpenZen POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenZen> ${CMAKE_CURRENT_BINARY_DIR}/_OpenZen.so
+        )
+    endif()
+
+    # copy python interface file
+    add_custom_command(TARGET OpenZen POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/bindings/OpenZenPython/OpenZen.py ${CMAKE_CURRENT_BINARY_DIR}/OpenZen.py
+    )
+endif()
 
 if (ZEN_TESTS)
     # Unit test binary for OpenZen
@@ -545,7 +661,7 @@ install(TARGETS OpenZen EXPORT OpenZenTarget
     PUBLIC_HEADER DESTINATION include
 )
 
-if(WIN32)
+if(WIN32 AND ZEN_USE_BINARY_LIBRARIES)
     get_target_property(FTDI_DLL ftdi IMPORTED_LOCATION)
     get_target_property(SIUSB_DLL siusb IMPORTED_LOCATION)
     get_target_property(PCANBASIC_DLL pcanbasic IMPORTED_LOCATION)

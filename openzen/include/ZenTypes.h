@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_API_ZENTYPES_H_
 #define ZEN_API_ZENTYPES_H_
 
@@ -186,6 +196,7 @@ typedef struct ZenImuData
     float r[3];
 
     /// Quaternion orientation data.
+    /// The component order is w, x, y, z
     float q[4];
 
     /// Orientation data as rotation matrix without offset.
@@ -291,12 +302,14 @@ typedef struct ZenGnssData
     /// height above WGS84 ellipsoid in m
     double height;
 
-    /// Heading of Vehicle in degrees in clockwise counting
+    /// Heading of sensor motion in degrees in clockwise counting
     /// and 0 degree being north, only usable for Dead-reckoning GPS
     double headingOfMotion;
 
     /// Heading of Vehicle in degrees in clockwise counting
     /// and 0 degree being north, only usable for Dead-reckoning GPS
+    /// This heading is not changing if the vehicle drives backwards for
+    /// example as it is aligned with the forward direction of the vehicle
     double headingOfVehicle;
 
     /// Heading Accuracy in degrees for both headingOfVehicle and
@@ -566,6 +579,10 @@ typedef enum EZenImuProperty
     /* UART output properties */
     ZenImuProperty_UartBaudRate,
     ZenImuProperty_UartFormat,
+
+    /* Sensor sync commands */
+    ZenImuProperty_StartSensorSync,              // void - send start sensor sync command
+    ZenImuProperty_StopSensorSync,               // void - send stop sensor sync command
 
     ZenImuProperty_Max
 } EZenImuProperty;

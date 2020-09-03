@@ -1,8 +1,0 @@
-ros-melodic-openzen-sensor (1.0.0-1stretch) stretch; urgency=high
-
-  * Initial Release of OpenZen ROS driver
-  * Contributors: LP-Research Inc. Team
-
- -- Feng <lxf@alubi.cn>  Sun, 12 Apr 2020 15:00:00 -0000
-
-
