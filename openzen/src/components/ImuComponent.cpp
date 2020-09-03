@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "components/ImuComponent.h"
 
 #define _USE_MATH_DEFINES
@@ -7,27 +17,14 @@
 #include "SensorManager.h"
 #include "ZenTypesHelpers.h"
 #include "properties/ImuSensorPropertiesV0.h"
+#include "components/SensorParsingUtil.h"
+
+#include <spdlog/spdlog.h>
 
 namespace zen
 {
-    namespace
-    {
-        float parseFloat16(gsl::span<const std::byte>& data, float denominator) noexcept
-        {
-            const int16_t temp = int16_t(data[0]) + int16_t(data[1]) * 256;
-            data = data.subspan(sizeof(int16_t));
-            return static_cast<float>(temp) / denominator;
-        }
-
-        float parseFloat32(gsl::span<const std::byte>& data) noexcept
-        {
-            const int32_t temp = ((int32_t(data[3]) * 256 + int32_t(data[2])) * 256 + int32_t(data[1])) * 256 + int32_t(data[0]);
-            data = data.subspan(sizeof(int32_t));
-            float result;
-            std::memcpy(&result, &temp, sizeof(int32_t));
-            return result;
-        }
-    }
+    using sensor_parsing_util::parseFloat16;
+    using sensor_parsing_util::parseFloat32;
 
     ImuComponent::ImuComponent(std::unique_ptr<ISensorProperties> properties, SyncedModbusCommunicator& communicator, unsigned int version) noexcept
         : SensorComponent(std::move(properties))
@@ -38,74 +35,74 @@ namespace zen
 
     ZenSensorInitError ImuComponent::init() noexcept
     {
-        auto cache = m_cache.borrow();
-
-        if (m_version == 0)
-            cache->samplingRate = 200;
-        else if (auto result = m_properties->getInt32(ZenImuProperty_SamplingRate))
-            cache->samplingRate = *result;
-        else
-            return ZenSensorInitError_InvalidConfig;
-
-        m_properties->subscribeToPropertyChanges(ZenImuProperty_SamplingRate, [=](SensorPropertyValue value) {
-            m_cache.borrow()->samplingRate = std::get<int32_t>(value);
-        });
+        auto & local_cache = m_cache;
 
         {
-            const auto result = m_properties->getArray(ZenImuProperty_AccAlignment, ZenPropertyType_Float, gsl::make_span(reinterpret_cast<std::byte*>(cache->accAlignMatrix.data), 9));
+            const auto result = m_properties->getArray(ZenImuProperty_AccAlignment, ZenPropertyType_Float,
+                gsl::make_span(reinterpret_cast<std::byte*>(local_cache.borrow()->accAlignMatrix.data), 9));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
         }
-        m_properties->subscribeToPropertyChanges(ZenImuProperty_AccAlignment, [=](SensorPropertyValue value) {
+        m_properties->subscribeToPropertyChanges(ZenImuProperty_AccAlignment,
+            [&local_cache](SensorPropertyValue value) {
             const float* data = reinterpret_cast<const float*>(std::get<gsl::span<const std::byte>>(value).data());
-            convertArrayToLpMatrix(data, &cache->accAlignMatrix);
+            convertArrayToLpMatrix(data, &local_cache.borrow()->accAlignMatrix);
         });
         {
-            const auto result = m_properties->getArray(ZenImuProperty_GyrAlignment, ZenPropertyType_Float, gsl::make_span(reinterpret_cast<std::byte*>(cache->gyrAlignMatrix.data), 9));
+            const auto result = m_properties->getArray(ZenImuProperty_GyrAlignment, ZenPropertyType_Float,
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->gyrAlignMatrix.data), 9));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
         }
-        m_properties->subscribeToPropertyChanges(ZenImuProperty_GyrAlignment, [=](SensorPropertyValue value) {
+        m_properties->subscribeToPropertyChanges(ZenImuProperty_GyrAlignment, [&local_cache](SensorPropertyValue value) {
             const float* data = reinterpret_cast<const float*>(std::get<gsl::span<const std::byte>>(value).data());
-            convertArrayToLpMatrix(data, &cache->gyrAlignMatrix);
+            convertArrayToLpMatrix(data, &local_cache.borrow()->gyrAlignMatrix);
         });
         {
-            const auto result = m_properties->getArray(ZenImuProperty_MagSoftIronMatrix, ZenPropertyType_Float, gsl::make_span(reinterpret_cast<std::byte*>(cache->softIronMatrix.data), 9));
+            const auto result = m_properties->getArray(ZenImuProperty_MagSoftIronMatrix, ZenPropertyType_Float,
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->softIronMatrix.data), 9));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
         }
-        m_properties->subscribeToPropertyChanges(ZenImuProperty_MagSoftIronMatrix, [=](SensorPropertyValue value) {
+        m_properties->subscribeToPropertyChanges(ZenImuProperty_MagSoftIronMatrix,
+            [&local_cache](SensorPropertyValue value) {
             const float* data = reinterpret_cast<const float*>(std::get<gsl::span<const std::byte>>(value).data());
-            convertArrayToLpMatrix(data, &cache->softIronMatrix);
+            convertArrayToLpMatrix(data, &local_cache.borrow()->softIronMatrix);
         });
         {
-            const auto result = m_properties->getArray(ZenImuProperty_AccBias, ZenPropertyType_Float, gsl::make_span(reinterpret_cast<std::byte*>(cache->accBias.data), 3));
+            const auto result = m_properties->getArray(ZenImuProperty_AccBias, ZenPropertyType_Float,
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->accBias.data), 3));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
 
-            m_properties->subscribeToPropertyChanges(ZenImuProperty_AccBias, [=](SensorPropertyValue value) {
+            m_properties->subscribeToPropertyChanges(ZenImuProperty_AccBias,
+                [&local_cache](SensorPropertyValue value) {
                 const float* data = reinterpret_cast<const float*>(std::get<gsl::span<const std::byte>>(value).data());
-                std::copy(data, data + 3, cache->accBias.data);
+                std::copy(data, data + 3, local_cache.borrow()->accBias.data);
             });
         }
         {
-            const auto result = m_properties->getArray(ZenImuProperty_GyrBias, ZenPropertyType_Float, gsl::make_span(reinterpret_cast<std::byte*>(cache->gyrBias.data), 3));
+            const auto result = m_properties->getArray(ZenImuProperty_GyrBias, ZenPropertyType_Float,
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->gyrBias.data), 3));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
 
-            m_properties->subscribeToPropertyChanges(ZenImuProperty_GyrBias, [=](SensorPropertyValue value) {
+            m_properties->subscribeToPropertyChanges(ZenImuProperty_GyrBias,
+                [&local_cache](SensorPropertyValue value) {
                 const float* data = reinterpret_cast<const float*>(std::get<gsl::span<const std::byte>>(value).data());
-                std::copy(data, data + 3, cache->gyrBias.data);
+                std::copy(data, data + 3, local_cache.borrow()->gyrBias.data);
             });
         }
         {
-            const auto result = m_properties->getArray(ZenImuProperty_MagHardIronOffset, ZenPropertyType_Float, gsl::make_span(reinterpret_cast<std::byte*>(cache->hardIronOffset.data), 3));
+            const auto result = m_properties->getArray(ZenImuProperty_MagHardIronOffset, ZenPropertyType_Float,
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->hardIronOffset.data), 3));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
 
-            m_properties->subscribeToPropertyChanges(ZenImuProperty_MagHardIronOffset, [=](SensorPropertyValue value) {
+            m_properties->subscribeToPropertyChanges(ZenImuProperty_MagHardIronOffset,
+                [&local_cache](SensorPropertyValue value) {
                 const float* data = reinterpret_cast<const float*>(std::get<gsl::span<const std::byte>>(value).data());
-                std::copy(data, data + 3, cache->hardIronOffset.data);
+                std::copy(data, data + 3, local_cache.borrow()->hardIronOffset.data);
             });
         }
 
@@ -197,9 +194,21 @@ namespace zen
         if (std::distance(begin, data.begin() + sizeof(uint32_t)) > size)
             return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
 
-        imuData.frameCount = *reinterpret_cast<const uint32_t*>(data.data());
-        imuData.timestamp = imuData.frameCount / static_cast<double>(m_cache.borrow()->samplingRate);
-        data = data.subspan(sizeof(uint32_t));
+        sensor_parsing_util::parseAndStoreScalar(data, &imuData.frameCount);
+
+        float timestampMultiplier = 0.0f;
+        if (const auto samplingRate = m_properties->getInt32(ZenImuProperty_SamplingRate)){
+            // When the VR firmware runs with 800 Hz, it also runs with an internal
+            // frequency of 800 Hz which means we need to multiply wtih 0.00125 to comput the
+            // correct timestamp.
+            // therefore, this value is set depending on the IMU variant.
+            timestampMultiplier = samplingRate.value() > 400 ? 0.00125f : 0.0025f;
+        } else {
+            spdlog::error("Cannot query sampling rate to comput timestamp");
+            return nonstd::make_unexpected(samplingRate.error());;
+        }
+
+        imuData.timestamp = imuData.frameCount * timestampMultiplier;
 
         if (auto lowPrec = m_properties->getBool(ZenImuProperty_OutputLowPrecision))
         {
@@ -208,8 +217,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + 3 * floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)(3 * floatSize)) {
+                        spdlog::error("Can't parse gyroscope because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     for (unsigned idx = 0; idx < 3; ++idx)
                         imuData.gRaw[idx] = (180.f / float(M_PI)) * (*lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data));
@@ -232,8 +243,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + 3 * floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)(3 * floatSize)) {
+                        spdlog::error("Can't parse acceleration because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     for (unsigned idx = 0; idx < 3; ++idx)
                         imuData.aRaw[idx] = *lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data);
@@ -256,8 +269,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + 3 * floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)(3 * floatSize)) {
+                        spdlog::error("Can't parse magnetometer because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     for (unsigned idx = 0; idx < 3; ++idx)
                         imuData.bRaw[idx] = *lowPrec ? parseFloat16(data, 100.f) : parseFloat32(data);
@@ -280,8 +295,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + 3 * floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)(3 * floatSize)) {
+                        spdlog::error("Can't parse angular velocity because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     for (unsigned idx = 0; idx < 3; ++idx)
                         imuData.w[idx] = (180.f / float(M_PI)) * (*lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data));
@@ -296,8 +313,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + 4 * floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)(4 * floatSize)) {
+                        spdlog::error("Can't parse quaternion because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     for (unsigned idx = 0; idx < 4; ++idx)
                         imuData.q[idx] = *lowPrec ? parseFloat16(data, 10000.f) : parseFloat32(data);
@@ -318,8 +337,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + 3 * floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)(3 * floatSize)) {
+                        spdlog::error("Can't parse euler angles because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     for (unsigned idx = 0; idx < 3; ++idx)
                         imuData.r[idx] = (180.f / float(M_PI)) * (*lowPrec ? parseFloat16(data, 10000.f) : parseFloat32(data));
@@ -334,8 +355,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + 3 * floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)(3 * floatSize)) {
+                        spdlog::error("Can't parse linear acceleration because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     for (unsigned idx = 0; idx < 3; ++idx)
                         imuData.linAcc[idx] = *lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data);
@@ -350,8 +373,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)floatSize) {
+                        spdlog::error("Can't parse pressure because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     imuData.pressure = *lowPrec ? parseFloat16(data, 100.f) : parseFloat32(data);
                 }
@@ -365,8 +390,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)floatSize) {
+                        spdlog::error("Can't parse altitude because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     imuData.altitude = *lowPrec ? parseFloat16(data, 10.f) : parseFloat32(data);
                 }
@@ -380,8 +407,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)floatSize) {
+                        spdlog::error("Can't parse temperature because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     imuData.temperature = *lowPrec ? parseFloat16(data, 100.f) : parseFloat32(data);
                 }
@@ -395,8 +424,10 @@ namespace zen
             {
                 if (*enabled)
                 {
-                    if (std::distance(begin, data.begin() + floatSize) > size)
-                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);;
+                    if (data.size() < (long int)floatSize) {
+                        spdlog::error("Can't parse heave motion because data entries missing.");
+                        return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
+                    }
 
                     imuData.hm.yHeave = *lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data);
                 }

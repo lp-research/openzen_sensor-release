@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_API_OPENZEN_H_
 #define ZEN_API_OPENZEN_H_
 
@@ -45,6 +55,18 @@ ZenEvents about sensor discovery results and incoming measurement data.
 #include <optional>
 #include <string_view>
 #endif
+
+inline bool operator==(const ZenSensorHandle& lhs, const ZenSensorHandle& rhs) {
+    return lhs.handle == rhs.handle;
+}
+
+inline bool operator==(const ZenClientHandle& lhs, const ZenClientHandle& rhs) {
+    return lhs.handle == rhs.handle;
+}
+
+inline bool operator==(const ZenComponentHandle& lhs, const ZenComponentHandle& rhs) {
+    return lhs.handle == rhs.handle;
+}
 
 namespace details
 {
@@ -355,6 +377,15 @@ namespace zen
         {
             return ZenSensorEquals(m_clientHandle, m_sensorHandle, &desc);
         }
+
+        /**
+         * Return the sensor handle this object in referencing to
+         */
+        ZenSensorHandle_t sensor() const noexcept
+        {
+            return m_sensorHandle;
+        }
+
 
         /**
          * Publish all data events from this sensor over a network interface

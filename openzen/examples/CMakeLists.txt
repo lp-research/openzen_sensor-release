@@ -34,8 +34,8 @@ else()
     )
 endif()
 
-# only copy Qt libraries if bluetooth support is enabled
-if(ZEN_BLUETOOTH)
+# only copy Qt libraries if Bluetooth BLE support is enabled
+if(ZEN_BLUETOOTH_BLE)
     add_custom_command(TARGET OpenZenExample POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_FILE:Qt5::Bluetooth>
@@ -62,3 +62,14 @@ if (!MSVC)
     target_link_libraries(OpenZenExampleCAPI
         OpenZen)
 endif()
+
+add_executable(OpenZenExampleCpp
+    ExampleCpp.cpp)
+
+target_link_libraries(OpenZenExampleCpp
+    OpenZen)
+
+target_compile_features(OpenZenExampleCpp
+    PRIVATE
+        cxx_std_11
+)

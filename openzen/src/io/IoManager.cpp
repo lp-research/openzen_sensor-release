@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "io/IoManager.h"
 
 #include <new>
@@ -5,14 +15,16 @@
 
 #include "io/systems/BleSystem.h"
 #include "io/systems/BluetoothSystem.h"
-#include "io/systems/FtdiUsbSystem.h"
 #include "io/systems/TestSensorSystem.h"
 #ifdef ZEN_NETWORK
 #include "io/systems/ZeroMQSystem.h"
 #endif
 #if WIN32
-#include "io/systems/PcanBasicSystem.h"
-#include "io/systems/SiUsbSystem.h"
+    #if ZEN_USE_BINARY_LIBRARIES
+    #include "io/systems/PcanBasicSystem.h"
+    #include "io/systems/FtdiUsbSystem.h"
+    #include "io/systems/SiUsbSystem.h"
+    #endif
 #include "io/systems/windows/WindowsDeviceSystem.h"
 #elif __linux__
 #include "io/systems/linux/LinuxDeviceSystem.h"
@@ -23,18 +35,22 @@
 namespace zen
 {
     static auto testSensorRegistry = makeRegistry<TestSensorSystem>();
-#ifdef ZEN_BLUETOOTH
+#ifdef ZEN_BLUETOOTH_BLE
     static auto bleRegistry = makeRegistry<BleSystem>();
+#endif
+#ifdef ZEN_BLUETOOTH
     static auto bluetoothRegistry = makeRegistry<BluetoothSystem>();
 #endif
 #ifdef ZEN_NETWORK
     static auto zmqRegistry = makeRegistry<ZeroMQSystem>();
 #endif
-    static auto ftdiUsbRegistry = makeRegistry<FtdiUsbSystem>();
 
 #if WIN32
+    #if ZEN_USE_BINARY_LIBRARIES
     static auto pcanRegistry = makeRegistry<PcanBasicSystem>();
     static auto siUsbRegistry = makeRegistry<SiUsbSystem>();
+    static auto ftdiUsbRegistry = makeRegistry<FtdiUsbSystem>();
+    #endif
 
     // [XXX] Need to re-evaluate the usage
     static auto windowsDeviceRegistry = makeRegistry<WindowsDeviceSystem>();
@@ -47,7 +63,7 @@ namespace zen
     IAutoIoSystemRegistry* IoManager::head = nullptr;
     IAutoIoSystemRegistry* IoManager::tail = nullptr;
 
-    namespace
+    namespace IoManagerSingleton
     {
         static unsigned int g_niftyCounter = 0;
         static std::aligned_storage_t<sizeof(IoManager), alignof(IoManager)> g_singletonBuffer;
@@ -56,19 +72,19 @@ namespace zen
 
     IoManagerInitializer::IoManagerInitializer()
     {
-        if (g_niftyCounter++ == 0)
-            new (&g_singleton) IoManager();
+        if (IoManagerSingleton::g_niftyCounter++ == 0)
+            new (&IoManagerSingleton::g_singleton) IoManager();
     }
 
     IoManagerInitializer::~IoManagerInitializer()
     {
-        if (--g_niftyCounter == 0)
-            (&g_singleton)->~IoManager();
+        if (--IoManagerSingleton::g_niftyCounter == 0)
+            (&IoManagerSingleton::g_singleton)->~IoManager();
     }
 
     IoManager& IoManager::get() noexcept
     {
-        return g_singleton;
+        return IoManagerSingleton::g_singleton;
     }
 
     void IoManager::initialize() noexcept

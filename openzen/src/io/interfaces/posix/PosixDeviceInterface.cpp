@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "io/interfaces/posix/PosixDeviceInterface.h"
 
 #include "utility/Finally.h"
@@ -23,7 +33,6 @@ namespace zen
         , m_pollingThread(&PosixDeviceInterfaceImpl::run, this)
         , m_fdRead(fdRead)
         , m_fdWrite(fdWrite)
-        
     {
     }
 
@@ -102,6 +111,10 @@ namespace zen
                     return error;
             }
         }
+
+        // cancel and wait for outstanding read operation
+        ::aio_cancel(m_fdWrite, currentCB);
+        ::aio_suspend(&currentCB, 1, nullptr);
 
         return ZenError_None;
     }
