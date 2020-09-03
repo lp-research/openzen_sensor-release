@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "ConnectionNegotiator.h"
 
 #include <chrono>
@@ -20,18 +30,26 @@ namespace zen
         // add all supported sensor types and their configurations
         // only support IG1's Imu yet, second gyroscope and GNSS
         // comes later
-        m_sensorConfigs.push_back( { {"LPMS-IG1-CAN", "LPMS-IG1-RS232"},
+        m_sensorConfigs.push_back( { {"LPMS-IG1-CAN", "LPMS-IG1-RS232", "LPMS-IG1-RS485"},
         {1,
           { ComponentConfig{1, g_zenSensorType_Imu}
           }
         }
       });
 
-      m_sensorConfigs.push_back( { {"LPMS-IG1P-CAN", "LPMS-IG1P-RS232"},
+      m_sensorConfigs.push_back( { {"LPMS-IG1P-CAN", "LPMS-IG1P-RS232", "LPMS-IG1P-RS485"},
       {1,
         {
             ComponentConfig{1, g_zenSensorType_Imu},
             ComponentConfig{1, g_zenSensorType_Gnss}
+        }
+      }
+    });
+
+      m_sensorConfigs.push_back( { {"LPMS-BE1"},
+      {1,
+        {
+            ComponentConfig{1, g_zenSensorType_Imu, SpecialOptions_SecondGyroIsPrimary}
         }
       }
     });
@@ -58,7 +76,9 @@ namespace zen
         // will not be in the input buffer.
         for (size_t retries = 0; retries < m_connectRetryAttempts; retries++) {
             m_terminated = false;
-            SPDLOG_DEBUG("Attempting to set sensor in command mode for connection negotiaton");
+            spdlog::debug("Attempting to set sensor in command mode for connection negotiaton");
+            // wait for some io messages to come in
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             // disable streaming during connection negotiation, command same for legacy and Ig1
             if (ZenError_None != communicator.send(0, uint8_t(EDevicePropertyV0::SetCommandMode), gsl::span<std::byte>()))
             {
@@ -69,7 +89,7 @@ namespace zen
                 std::unique_lock<std::mutex> lock(m_mutex);
                 if (m_cv.wait_for(lock, IO_TIMEOUT, [this]() { return m_terminated; }) == false) {
                     // hit timeout, will retry
-                    SPDLOG_DEBUG("Time out while attempting to set sensor in command mode for connection negotiaton");
+                    spdlog::debug("Time out while attempting to set sensor in command mode for connection negotiaton");
 
                     // reset parser because if the data transmission of the sensor stopped without
                     // sending the full package payload, we might still think we are parsing the payload
@@ -83,13 +103,13 @@ namespace zen
         }
 
         if (commandModeReply == false) {
-            spdlog::error("Timout when setting sensor to command mode before configuration.");
+            spdlog::error("Time out when setting sensor to command mode before configuration.");
             return nonstd::make_unexpected(ZenSensorInitError_Timeout);
         }
 
         // will send command 21, which is GET_IMU_ID for legacy sensors. So legacy sensors will return one 32-bit
         // result while its the GET_FIRMWARE_INFO for version 1 sensors, which is a 24-byte long string.
-        SPDLOG_DEBUG("Attempting to query firmware version");
+        spdlog::debug("Attempting to query firmware version");
         m_terminated = false;
         if (ZenError_None != communicator.send(0, uint8_t(EDevicePropertyV1::GetFirmwareInfo), gsl::span<std::byte>()))
         {
@@ -117,7 +137,7 @@ namespace zen
         }
 
         if (m_deviceName) {
-            SPDLOG_DEBUG("Device name from Ig1 protocol: {0}", *m_deviceName);
+            spdlog::debug("Device name from Ig1 protocol: {0}", *m_deviceName);
         }
 
         return loadDeviceConfig();

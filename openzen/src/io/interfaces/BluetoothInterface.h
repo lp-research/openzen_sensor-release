@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_IO_INTERFACES_BLUETOOTHINTERFACE_H_
 #define ZEN_IO_INTERFACES_BLUETOOTHINTERFACE_H_
 
@@ -38,8 +48,10 @@ namespace zen
     private:
         int run();
 
-        std::unique_ptr<BluetoothDeviceHandler> m_handler;
         std::atomic_bool m_terminate;
+
+        std::unique_ptr<BluetoothDeviceHandler> m_handler;
+
         std::thread m_ioReader;
     };
 }

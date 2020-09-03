@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_PROPERTIES_GNSSSENSORPROPERTIESV1_H_
 #define ZEN_PROPERTIES_GNSSSENSORPROPERTIESV1_H_
 
@@ -7,10 +17,6 @@
 
 #include "InternalTypes.h"
 #include "ZenTypes.h"
-
-#define GET_OR(x) isGetter ? (x) : EDevicePropertyV1::Ack
-#define SET_OR(x) isGetter ? EDevicePropertyV1::Ack : (x)
-#define GET_SET(x, y) isGetter ? (x) : (y)
 
 namespace zen
 {

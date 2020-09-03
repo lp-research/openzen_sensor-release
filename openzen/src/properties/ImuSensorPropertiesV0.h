@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_PROPERTIES_IMUSENSORPROPERTIESV0_H_
 #define ZEN_PROPERTIES_IMUSENSORPROPERTIESV0_H_
 
@@ -7,10 +17,6 @@
 
 #include "InternalTypes.h"
 #include "ZenTypes.h"
-
-#define GET_OR(x) isGetter ? (x) : EDevicePropertyV0::Ack
-#define SET_OR(x) isGetter ? EDevicePropertyV0::Ack : (x)
-#define GET_SET(x, y) isGetter ? (x) : (y)
 
 namespace zen
 {
@@ -29,6 +35,12 @@ namespace zen
             case ZenImuProperty_ResetOrientationOffset:
                 return EDevicePropertyV0::ResetOrientationOffset;
 
+            case ZenImuProperty_StartSensorSync:
+                return EDevicePropertyV0::StartSync;
+
+            case ZenImuProperty_StopSensorSync:
+                return EDevicePropertyV0::StopSync;
+
             default:
                 return EDevicePropertyV0::Ack;
             }
@@ -36,93 +48,100 @@ namespace zen
 
         constexpr EDevicePropertyV0 map(ZenProperty_t property, bool isGetter)
         {
+            const auto set_or = [isGetter](EDevicePropertyV0 prop) {
+                return isGetter ? EDevicePropertyV0::Ack : prop;
+            };
+            const auto get_set = [isGetter] (EDevicePropertyV0 x, EDevicePropertyV0 y) {
+                return isGetter ? x : y;
+            };
+
             switch (property)
             {
             case ZenImuProperty_SamplingRate:
-                return SET_OR(EDevicePropertyV0::SetSamplingRate);
+                return set_or(EDevicePropertyV0::SetSamplingRate);
 
             case ZenImuProperty_CentricCompensationRate:
-                return GET_SET(EDevicePropertyV0::GetCentricCompensationRate, EDevicePropertyV0::SetCentricCompensationRate);
+                return get_set(EDevicePropertyV0::GetCentricCompensationRate, EDevicePropertyV0::SetCentricCompensationRate);
 
             case ZenImuProperty_LinearCompensationRate:
-                return GET_SET(EDevicePropertyV0::GetLinearCompensationRate, EDevicePropertyV0::SetLinearCompensationRate);
+                return get_set(EDevicePropertyV0::GetLinearCompensationRate, EDevicePropertyV0::SetLinearCompensationRate);
 
             case ZenImuProperty_FieldRadius:
-                return GET_SET(EDevicePropertyV0::GetFieldRadius, EDevicePropertyV0::SetFieldRadius);
+                return get_set(EDevicePropertyV0::GetFieldRadius, EDevicePropertyV0::SetFieldRadius);
 
             case ZenImuProperty_FilterMode:
-                return GET_SET(EDevicePropertyV0::GetFilterMode, EDevicePropertyV0::SetFilterMode);
+                return get_set(EDevicePropertyV0::GetFilterMode, EDevicePropertyV0::SetFilterMode);
 
             case ZenImuProperty_FilterPreset:
-                return GET_SET(EDevicePropertyV0::GetFilterPreset, EDevicePropertyV0::SetFilterPreset);
+                return get_set(EDevicePropertyV0::GetFilterPreset, EDevicePropertyV0::SetFilterPreset);
 
             case ZenImuProperty_OrientationOffsetMode:
-                return SET_OR(EDevicePropertyV0::SetOrientationOffsetMode);
+                return set_or(EDevicePropertyV0::SetOrientationOffsetMode);
 
             case ZenImuProperty_AccAlignment:
-                return GET_SET(EDevicePropertyV0::GetAccAlignment, EDevicePropertyV0::SetAccAlignment);
+                return get_set(EDevicePropertyV0::GetAccAlignment, EDevicePropertyV0::SetAccAlignment);
 
             case ZenImuProperty_AccBias:
-                return GET_SET(EDevicePropertyV0::GetAccBias, EDevicePropertyV0::SetAccBias);
+                return get_set(EDevicePropertyV0::GetAccBias, EDevicePropertyV0::SetAccBias);
 
             case ZenImuProperty_AccRange:
-                return GET_SET(EDevicePropertyV0::GetAccRange, EDevicePropertyV0::SetAccRange);
+                return get_set(EDevicePropertyV0::GetAccRange, EDevicePropertyV0::SetAccRange);
 
             case ZenImuProperty_GyrAlignment:
-                return GET_SET(EDevicePropertyV0::GetGyrAlignment, EDevicePropertyV0::SetGyrAlignment);
+                return get_set(EDevicePropertyV0::GetGyrAlignment, EDevicePropertyV0::SetGyrAlignment);
 
             case ZenImuProperty_GyrBias:
-                return GET_SET(EDevicePropertyV0::GetGyrBias, EDevicePropertyV0::SetGyrBias);
+                return get_set(EDevicePropertyV0::GetGyrBias, EDevicePropertyV0::SetGyrBias);
 
             case ZenImuProperty_GyrRange:
-                return GET_SET(EDevicePropertyV0::GetGyrRange, EDevicePropertyV0::SetGyrRange);
+                return get_set(EDevicePropertyV0::GetGyrRange, EDevicePropertyV0::SetGyrRange);
 
             case ZenImuProperty_GyrUseAutoCalibration:
-                return SET_OR(EDevicePropertyV0::SetGyrUseAutoCalibration);
+                return set_or(EDevicePropertyV0::SetGyrUseAutoCalibration);
 
             case ZenImuProperty_MagAlignment:
-                return GET_SET(EDevicePropertyV0::GetMagAlignment, EDevicePropertyV0::SetMagAlignment);
+                return get_set(EDevicePropertyV0::GetMagAlignment, EDevicePropertyV0::SetMagAlignment);
 
             case ZenImuProperty_MagBias:
-                return GET_SET(EDevicePropertyV0::GetMagBias, EDevicePropertyV0::SetMagBias);
+                return get_set(EDevicePropertyV0::GetMagBias, EDevicePropertyV0::SetMagBias);
 
             case ZenImuProperty_MagRange:
-                return GET_SET(EDevicePropertyV0::GetMagRange, EDevicePropertyV0::SetMagRange);
+                return get_set(EDevicePropertyV0::GetMagRange, EDevicePropertyV0::SetMagRange);
 
             case ZenImuProperty_MagReference:
-                return GET_SET(EDevicePropertyV0::GetMagReference, EDevicePropertyV0::SetMagReference);
+                return get_set(EDevicePropertyV0::GetMagReference, EDevicePropertyV0::SetMagReference);
 
             case ZenImuProperty_MagHardIronOffset:
-                return GET_SET(EDevicePropertyV0::GetMagHardIronOffset, EDevicePropertyV0::SetMagHardIronOffset);
+                return get_set(EDevicePropertyV0::GetMagHardIronOffset, EDevicePropertyV0::SetMagHardIronOffset);
 
             case ZenImuProperty_MagSoftIronMatrix:
-                return GET_SET(EDevicePropertyV0::GetMagSoftIronMatrix, EDevicePropertyV0::SetMagSoftIronMatrix);
+                return get_set(EDevicePropertyV0::GetMagSoftIronMatrix, EDevicePropertyV0::SetMagSoftIronMatrix);
 
             /* CAN bus properties */
             case ZenImuProperty_CanChannelMode:
-                return GET_SET(EDevicePropertyV0::GetCanConfiguration, EDevicePropertyV0::SetCanChannelMode);
+                return get_set(EDevicePropertyV0::GetCanConfiguration, EDevicePropertyV0::SetCanChannelMode);
 
             case ZenImuProperty_CanPointMode:
-                return GET_SET(EDevicePropertyV0::GetCanConfiguration, EDevicePropertyV0::SetCanPointMode);
+                return get_set(EDevicePropertyV0::GetCanConfiguration, EDevicePropertyV0::SetCanPointMode);
 
             case ZenImuProperty_CanStartId:
-                return GET_SET(EDevicePropertyV0::GetCanConfiguration, EDevicePropertyV0::SetCanStartId);
+                return get_set(EDevicePropertyV0::GetCanConfiguration, EDevicePropertyV0::SetCanStartId);
 
             case ZenImuProperty_CanBaudrate:
-                return GET_SET(EDevicePropertyV0::GetConfig, EDevicePropertyV0::SetCanBaudrate);
+                return get_set(EDevicePropertyV0::GetConfig, EDevicePropertyV0::SetCanBaudrate);
 
             case ZenImuProperty_CanMapping:
-                return GET_SET(EDevicePropertyV0::GetCanMapping, EDevicePropertyV0::SetCanMapping);
+                return get_set(EDevicePropertyV0::GetCanMapping, EDevicePropertyV0::SetCanMapping);
 
             case ZenImuProperty_CanHeartbeat:
-                return GET_SET(EDevicePropertyV0::GetCanHeartbeat, EDevicePropertyV0::SetCanHeartbeat);
+                return get_set(EDevicePropertyV0::GetCanHeartbeat, EDevicePropertyV0::SetCanHeartbeat);
 
             /* UART output properties */
             case ZenImuProperty_UartBaudRate:
-                return GET_SET(EDevicePropertyV0::GetUartBaudrate, EDevicePropertyV0::SetUartBaudrate);
+                return get_set(EDevicePropertyV0::GetUartBaudrate, EDevicePropertyV0::SetUartBaudrate);
 
             case ZenImuProperty_UartFormat:
-                return GET_SET(EDevicePropertyV0::GetUartBaudrate, EDevicePropertyV0::SetUartFormat);
+                return get_set(EDevicePropertyV0::GetUartBaudrate, EDevicePropertyV0::SetUartFormat);
 
             default:
                 return EDevicePropertyV0::Ack;
@@ -143,8 +162,10 @@ namespace zen
                 return 100;
             else if (value <= 200)
                 return 200;
-            else
+            else if (value <= 400)
                 return 400;
+            else
+                return 800;
         }
 
         inline std::pair<ZenError, size_t> supportedSamplingRates(gsl::span<int32_t> buffer)

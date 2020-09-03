@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "properties/Ig1ImuProperties.h"
 
 #include <math.h>
@@ -9,14 +19,14 @@
 
 namespace zen
 {
-    namespace
+    namespace Ig1
     {
         template <ZenProperty_t type>
         struct OutputDataFlag
         {};
 
         // change here for the new output flags of IG1
-/*      
+/*
 not supported by Ig1 atm
 template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
         {
@@ -145,12 +155,9 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
         }
     }
 
-    Ig1ImuProperties::Ig1ImuProperties(SyncedModbusCommunicator& communicator) noexcept
-        : m_cache{}
-        , m_communicator(communicator)
-        , m_streaming(true)
+    Ig1ImuProperties::Ig1ImuProperties(SyncedModbusCommunicator& communicator) noexcept :
+        m_communicator(communicator), m_streaming(true)
     {
-        m_cache.samplingRate = 200;
     }
 
     ZenError Ig1ImuProperties::execute(ZenProperty_t command) noexcept
@@ -169,7 +176,15 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
                 });
 
                 const auto function = static_cast<DeviceProperty_t>(imu::v1::mapCommand(command));
-                return m_communicator.sendAndWaitForAck(0, function, function, {});
+                // exception: in case there is a poll request don't wait for reply and return
+                // immediately to maximize polling rate
+                if (function == static_cast<DeviceProperty_t>(EDevicePropertyV1::GetRawImuSensorData)) {
+                    if (auto error = m_communicator.sendAndDontWait(0, function, function, {}))
+                        return error;
+                    return ZenError_None;
+                } else {
+                    return m_communicator.sendAndWaitForAck(0, function, function, {});
+                }
             }
             else
             {
@@ -232,6 +247,7 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
 
     nonstd::expected<bool, ZenError> Ig1ImuProperties::getBool(ZenProperty_t property) noexcept
     {
+        using Ig1::getOutputDataFlag;
         if (property == ZenImuProperty_StreamData)
             return m_streaming;
         // this is a Int32 on the device side but treated as a bool in OpenZen
@@ -252,7 +268,7 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
             return getOutputDataFlag<ZenImuProperty_OutputAngularVel>(m_cache.outputDataBitset);
         else if (property == ZenImuProperty_OutputTemperature)
             return getOutputDataFlag<ZenImuProperty_OutputTemperature>(m_cache.outputDataBitset);
-        
+
         // Gyr 0
         else if (property == ZenImuProperty_OutputRawGyr0)
             return getOutputDataFlag<ZenImuProperty_OutputRawGyr0>(m_cache.outputDataBitset);
@@ -272,7 +288,7 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
         // calibrated acceleration
         else if (property == ZenImuProperty_OutputAccCalibrated)
             return getOutputDataFlag<ZenImuProperty_OutputAccCalibrated>(m_cache.outputDataBitset);
-        
+
         else if (property == ZenImuProperty_OutputRawAcc)
             return getOutputDataFlag<ZenImuProperty_OutputRawAcc>(m_cache.outputDataBitset);
         else if (property == ZenImuProperty_OutputRawMag)
@@ -312,34 +328,27 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
     {
         if (!isArray(property) && type(property) == ZenPropertyType_Int32)
         {
-            if (property == ZenImuProperty_SamplingRate)
+            if (auto streaming = getBool(ZenImuProperty_StreamData))
             {
-                return m_cache.samplingRate;
+                if (*streaming)
+                    if (auto error = setBool(ZenImuProperty_StreamData, false))
+                        return nonstd::make_unexpected(error);
+
+                auto guard = finally([&]() {
+                    if (*streaming)
+                        setBool(ZenImuProperty_StreamData, true);
+                });
+
+                // Communication protocol only supports uint32_t
+                const auto function = static_cast<DeviceProperty_t>(imu::v1::map(property, true));
+                if (auto result = m_communicator.sendAndWaitForResult<uint32_t>(0, function, function, {}))
+                    return static_cast<int32_t>(*result);
+                else
+                    return result.error();
             }
             else
             {
-                if (auto streaming = getBool(ZenImuProperty_StreamData))
-                {
-                    if (*streaming)
-                        if (auto error = setBool(ZenImuProperty_StreamData, false))
-                            return nonstd::make_unexpected(error);
-
-                    auto guard = finally([&]() {
-                        if (*streaming)
-                            setBool(ZenImuProperty_StreamData, true);
-                    });
-
-                    // Communication protocol only supports uint32_t
-                    const auto function = static_cast<DeviceProperty_t>(imu::v1::map(property, true));
-                    if (auto result = m_communicator.sendAndWaitForResult<uint32_t>(0, function, function, {}))
-                        return static_cast<int32_t>(*result);
-                    else
-                        return result.error();
-                }
-                else
-                {
-                    return streaming.error();
-                }
+                return streaming.error();
             }
         }
 
@@ -382,6 +391,7 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
 
     ZenError Ig1ImuProperties::setBool(ZenProperty_t property, bool value) noexcept
     {
+        using Ig1::setOutputDataFlag;
         if (property == ZenImuProperty_StreamData)
         {
             if (m_streaming != value)
@@ -505,9 +515,6 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
                 const auto function = static_cast<DeviceProperty_t>(imu::v1::map(property, false));
                 if (auto error = m_communicator.sendAndWaitForAck(0, function, function, gsl::make_span(reinterpret_cast<const std::byte*>(&uiValue), sizeof(uiValue))))
                     return error;
-
-                if (property == ZenImuProperty_SamplingRate)
-                    m_cache.samplingRate = uiValue;
 
                 notifyPropertyChange(property, value);
                 return ZenError_None;

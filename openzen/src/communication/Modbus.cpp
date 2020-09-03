@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "Modbus.h"
 
 #include <stdexcept>
@@ -320,7 +330,9 @@ namespace zen::modbus
         frame[4] = std::byte(0);
         frame[5] = std::byte(length);
         frame[6] = std::byte(0);
-        std::copy(data, data + length, &frame[7]);
+        if (length > 0) {
+            std::copy(data, data + length, &frame[7]);
+        }
 
         const uint16_t checksum = lrcLp(address, function, data, length);
         frame[7 + length] = std::byte(checksum & 0xff);
@@ -439,7 +451,9 @@ namespace zen::modbus
         frame[0] = std::byte(address);
         frame[1] = std::byte(function);
         frame[2] = std::byte(length);
-        std::copy(data, data + length, &frame[3]);
+        if (length > 0) {
+            std::copy(data, data + length, &frame[3]);
+        }
 
         const uint16_t checksum = crc16(0xffff, address, function, data, length);
         frame[3 + length] = std::byte(checksum & 0xff);
