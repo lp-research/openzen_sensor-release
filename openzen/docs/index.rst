@@ -8,10 +8,12 @@ Contents
 
     ./setup
     ./getting_started
+    ./examples
     ./supported_sensors
     ./io_systems
     ./c_api
     ./cpp_api
+    ./python_api
     ./csharp_api
     ./unity_plugin
     ./ros
@@ -21,6 +23,7 @@ Overview
 
 .. image:: https://lpresearch.bitbucket.io/openzen_resources/OpenZenUnityDemo.gif
    :alt: OpenZen Unity plugin connected to a LPMS-CU2 sensor and live visualization of sensor orientation
+
 OpenZen Unity plugin connected to a LPMS-CU2 sensor and live visualization of sensor orientation.
 
 OpenZen is a framework that allows access to Sensor Hardware from multiple vendors

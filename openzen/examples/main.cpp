@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "OpenZen.h"
 
 #include <array>
@@ -143,6 +153,7 @@ int main(int argc, char *argv[])
 
     if (g_discoveredSensors.empty())
     {
+        std::cout << " -- no sensors found -- " << std::endl;
         g_terminate = true;
         client.close();
         pollingThread.join();

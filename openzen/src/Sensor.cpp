@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "Sensor.h"
 
 #include <algorithm>
@@ -208,7 +218,7 @@ namespace zen
                     return ZenSensorInitError_UnsupportedComponent;
                 }
 
-                auto component = factory.value()->make_component(config.version, idx++, *m_communicator);
+                auto component = factory.value()->make_component(config.version, config.specialOptions, idx++, *m_communicator);
                 if (!component) {
                     spdlog::error("Cannot create object for component {0} and version {1}", config.id, config.version);
                     return component.error();

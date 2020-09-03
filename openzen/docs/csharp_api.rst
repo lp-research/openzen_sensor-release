@@ -4,10 +4,10 @@ C# API
 
 Overview
 ========
-The OpenZen language bindings allow you to use access sensor data from any C# data.
-The functions names are the same which are used by the OpenZen C API. In order to use
-C# language bindings, you need to add the C# files in the folder ``bindings/OpenZenCSharp``
-to your project and the dynamic link libraries from the binary OpenZen folder.
+The OpenZen language bindings allow you to access sensor data from any C# program.
+The function names are the same which are used by the OpenZen C API. In order to use
+the C# language bindings, you need to add the C# files in the folder ``bindings/OpenZenCSharp``
+to your project as well as the dynamic link libraries from the binary OpenZen folder.
 
 You can find a complete OpenZen C# example for Visual Studio in this `folder <https://bitbucket.org/lpresearch/openzen/src/master/bindings/OpenZenCSharpBindingTest/>`_.
 
@@ -36,6 +36,6 @@ by the interface using the following method:
     // read quaternion
     OpenZenFloatArray fq = OpenZenFloatArray.frompointer(zenEvent.data.imuData.q);
 
-    Console.WriteLine("Sensor data\n -> Acceleration a = " + fa.getitem(0) + " " + +fa.getitem(1) + " " + fa.getitem(2));
-    Console.WriteLine(" -> Euler angles r = " + fr.getitem(0) + " " + +fr.getitem(1) + " " + fr.getitem(2));
-    Console.WriteLine(" -> Quaternion w = " + fq.getitem(0) + " x " + +fq.getitem(1) + " y " + +fq.getitem(2) + " z " + + fq.getitem(3));
+    Console.WriteLine("Sensor data\n -> Acceleration a = " + fa.getitem(0) + " " + fa.getitem(1) + " " + fa.getitem(2));
+    Console.WriteLine(" -> Euler angles r = " + fr.getitem(0) + " " + fr.getitem(1) + " " + fr.getitem(2));
+    Console.WriteLine(" -> Quaternion w = " + fq.getitem(0) + " x " + fq.getitem(1) + " y " + fq.getitem(2) + " z " + fq.getitem(3));
