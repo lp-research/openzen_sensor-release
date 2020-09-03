@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_COMMUNICATION_SYNCEDMODBUSCOMMUNICATOR_H_
 #define ZEN_COMMUNICATION_SYNCEDMODBUSCOMMUNICATOR_H_
 
@@ -39,6 +49,9 @@ namespace zen
 
         /** Sends data to the IO interface, and waits for an acknowledgment */
         ZenError sendAndWaitForAck(uint8_t address, uint8_t function, ZenProperty_t property, gsl::span<const std::byte> data) noexcept;
+
+        ZenError sendAndDontWait(uint8_t address, uint8_t function, ZenProperty_t property,
+            gsl::span<const std::byte> data) noexcept;
 
         /** Sends data to the IO interface, and waits for a result array */
         template <typename T>

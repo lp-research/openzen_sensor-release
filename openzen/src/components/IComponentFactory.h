@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_COMPONENTS_ICOMPONENTFACTORY_H_
 #define ZEN_COMPONENTS_ICOMPONENTFACTORY_H_
 
@@ -7,6 +17,7 @@
 #include "nonstd/expected.hpp"
 
 #include "SensorComponent.h"
+#include "SensorConfig.h"
 
 namespace zen
 {
@@ -23,6 +34,7 @@ namespace zen
          */
         virtual nonstd::expected<std::unique_ptr<SensorComponent>, ZenSensorInitError> make_component(
             unsigned int version,
+            SpecialOptions options,
             uint8_t id,
             class SyncedModbusCommunicator& communicator
         ) const noexcept = 0;

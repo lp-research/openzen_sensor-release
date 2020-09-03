@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_PROPERTIES_IG1IMUPROPERTIES_H_
 #define ZEN_PROPERTIES_IG1IMUPROPERTIES_H_
 
@@ -74,7 +84,6 @@ namespace zen
 
         struct IMUState
         {
-            std::atomic_uint32_t samplingRate;
             std::atomic_uint32_t outputDataBitset;
         } m_cache;
 

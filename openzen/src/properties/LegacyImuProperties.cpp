@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "properties/LegacyImuProperties.h"
 
 #include <math.h>
@@ -6,9 +16,11 @@
 #include "properties/ImuSensorPropertiesV0.h"
 #include "utility/Finally.h"
 
+#include <spdlog/spdlog.h>
+
 namespace zen
 {
-    namespace
+    namespace LegacyImu
     {
         template <ZenProperty_t type>
         struct OutputDataFlag
@@ -74,6 +86,11 @@ namespace zen
             using index = std::integral_constant<unsigned int, 9>;
         };
 
+        template <> struct OutputDataFlag<ZenImuProperty_SamplingRate>
+        {
+            using index = std::integral_constant<unsigned int, 0>;
+        };
+
         template <> struct OutputDataFlag<ZenImuProperty_GyrUseAutoCalibration>
         {
             using index = std::integral_constant<unsigned int, 30>;
@@ -83,6 +100,38 @@ namespace zen
         constexpr bool getOutputDataFlag(std::atomic_uint32_t& outputDataBitset) noexcept
         {
             return (outputDataBitset & (1 << OutputDataFlag<property>::index::value)) != 0;
+        }
+
+        template <ZenProperty_t property>
+        constexpr int getOutputDataSamplingRate(std::atomic_uint32_t& outputDataBitset) noexcept
+        {
+            // read the sampling rate from the first 3 bits, not documentened in public
+            // documents at this time
+            auto idx = OutputDataFlag<property>::index::value;
+            const uint32_t samplingFlag = (outputDataBitset & (1 << (idx + 0))) +
+                (outputDataBitset & (1 << (idx + 1))) +
+                (outputDataBitset & (1 << (idx + 2)));
+
+            if (samplingFlag == 0) {
+                return 5;
+            } else if (samplingFlag == 1) {
+                return 10;
+            } else if (samplingFlag == 2) {
+                return 25;
+            } else if (samplingFlag == 3) {
+                return 50;
+            } else if (samplingFlag == 4) {
+                return 100;
+            } else if (samplingFlag == 5) {
+                return 200;
+            } else if (samplingFlag == 6) {
+                return 400;
+            } else if (samplingFlag == 7) {
+                return 800;
+            } else {
+                spdlog::error("Sampling flag {0} in Config Data set not supported", int(samplingFlag));
+                return 0;
+            }
         }
 
         template <ZenProperty_t property>
@@ -117,7 +166,8 @@ namespace zen
         , m_communicator(communicator)
         , m_streaming(true)
     {
-        m_cache.samplingRate = 200;
+        // 0 means no valid sampling rate has been set yet
+        m_cache.samplingRate = 0;
     }
 
     void LegacyImuProperties::setConfigBitset(uint32_t bitset) noexcept {
@@ -125,7 +175,8 @@ namespace zen
 
         // extract additional configurations, they are read from the
         // config bitset but set via their own command call
-        m_cache.gyrAutoCalibration = getOutputDataFlag< ZenImuProperty_GyrUseAutoCalibration>(m_cache.configBitset);
+        m_cache.gyrAutoCalibration = LegacyImu::getOutputDataFlag< ZenImuProperty_GyrUseAutoCalibration>(m_cache.configBitset);
+        m_cache.samplingRate = LegacyImu::getOutputDataSamplingRate<ZenImuProperty_SamplingRate>(m_cache.configBitset);
     }
 
     ZenError LegacyImuProperties::execute(ZenProperty_t command) noexcept
@@ -198,6 +249,7 @@ namespace zen
 
     nonstd::expected<bool, ZenError> LegacyImuProperties::getBool(ZenProperty_t property) noexcept
     {
+        using LegacyImu::getOutputDataFlag;
         if (property == ZenImuProperty_StreamData)
             return m_streaming;
         else if (property == ZenImuProperty_GyrUseAutoCalibration)
@@ -409,8 +461,10 @@ namespace zen
         if (isArray(property) || type(property) != ZenPropertyType_Int32)
             return nonstd::make_unexpected(ZenError_UnknownProperty);
 
-        if (property == ZenImuProperty_SamplingRate)
+        // can't query sampling rate but output what we have in the cache
+        if (property == ZenImuProperty_SamplingRate){
             return m_cache.samplingRate;
+        }
 
         auto streaming = getBool(ZenImuProperty_StreamData);
         if (!streaming)
@@ -480,15 +534,14 @@ namespace zen
 
     ZenError LegacyImuProperties::setBool(ZenProperty_t property, bool value) noexcept
     {
+        using LegacyImu::setOutputDataFlag;
         if (property == ZenImuProperty_StreamData)
         {
             if (m_streaming != value)
             {
-                uint32_t temp;
                 const auto propertyV0 = value ? EDevicePropertyV0::SetStreamMode : EDevicePropertyV0::SetCommandMode;
                 if (auto error = m_communicator.sendAndWaitForAck(0, static_cast<DeviceProperty_t>(propertyV0),
-                    static_cast<ZenProperty_t>(propertyV0),
-                    gsl::make_span(reinterpret_cast<const std::byte*>(&temp), sizeof(temp))))
+                    static_cast<ZenProperty_t>(propertyV0), {}))
                     return error;
 
                 m_streaming = value;
@@ -511,7 +564,8 @@ namespace zen
 
                 uint32_t iValue = value ? 1 : 0;
                 const auto function = static_cast<DeviceProperty_t>(EDevicePropertyV0::SetGyrUseAutoCalibration);
-                if (auto error = m_communicator.sendAndWaitForAck(0, function, function, gsl::span(reinterpret_cast<const std::byte*>(&iValue), sizeof(iValue))))
+                if (auto error = m_communicator.sendAndWaitForAck(0, function, function,
+                    gsl::span(reinterpret_cast<const std::byte*>(&iValue), sizeof(iValue))))
                     return error;
 
                 m_cache.gyrAutoCalibration = value;
@@ -709,7 +763,7 @@ namespace zen
             return 20;
         else if (value <= 30000)
             return 30;
-        else if (value <= 500000)
+        else if (value <= 50000)
             return 50;
         else if (value <= 125000)
             return 125;
@@ -854,6 +908,8 @@ namespace zen
         case ZenImuProperty_PollSensorData:
         case ZenImuProperty_CalibrateGyro:
         case ZenImuProperty_ResetOrientationOffset:
+        case ZenImuProperty_StartSensorSync:
+        case ZenImuProperty_StopSensorSync:
             return true;
 
         default:

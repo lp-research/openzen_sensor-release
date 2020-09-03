@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "SyncedModbusCommunicator.h"
 
 #include <cstring>
@@ -28,6 +38,15 @@ namespace zen
             return error;
 
         return terminateWaitOnPublishOrTimeout();
+    }
+
+    ZenError SyncedModbusCommunicator::sendAndDontWait(uint8_t address, uint8_t function, ZenProperty_t,
+        gsl::span<const std::byte> data) noexcept
+    {
+        if (auto error = m_communicator->send(address, function, data))
+            return error;
+
+        return ZenError_None;
     }
 
     template <typename T>

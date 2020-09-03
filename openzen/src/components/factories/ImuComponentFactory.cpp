@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "ImuComponentFactory.h"
 
 #include <spdlog/spdlog.h>
@@ -28,6 +38,7 @@ namespace zen
 
     nonstd::expected<std::unique_ptr<SensorComponent>, ZenSensorInitError> ImuComponentFactory::make_component(
         unsigned int version,
+        SpecialOptions specialOptions,
         uint8_t id,
         SyncedModbusCommunicator& communicator
     ) const noexcept
@@ -70,7 +81,10 @@ namespace zen
             {
                 SPDLOG_DEBUG("Loaded output bitset of Ig1 sensor: {}", bitset.value());
                 properties->setOutputDataBitset(*bitset);
-                return std::make_unique<ImuIg1Component>(std::move(properties), communicator, version);
+
+                bool useSecondGyroAsPrimary = specialOptions & SpecialOptions_SecondGyroIsPrimary;
+
+                return std::make_unique<ImuIg1Component>(std::move(properties), communicator, version, useSecondGyroAsPrimary);
             }
             else
             {

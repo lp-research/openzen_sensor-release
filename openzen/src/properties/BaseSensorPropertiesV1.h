@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_SENSOR_PROPERTIES_BASESENSORPROPERTIESV1_H_
 #define ZEN_SENSOR_PROPERTIES_BASESENSORPROPERTIESV1_H_
 
@@ -6,10 +16,6 @@
 
 #include <array>
 #include <optional>
-
-#define GET_OR_V1(x) isGetter ? (x) : EDevicePropertyV1::Ack
-#define SET_OR_V1(x) isGetter ? EDevicePropertyV1::Ack : (x)
-#define GET_SET_V1(x, y) isGetter ? (x) : (y)
 
 namespace zen
 {
@@ -47,22 +53,26 @@ namespace zen
 
         constexpr EDevicePropertyV1 map(ZenProperty_t property, bool isGetter)
         {
+            const auto get_or = [isGetter](EDevicePropertyV1 prop) {
+                return isGetter ? prop : EDevicePropertyV1::Ack;
+            };
+
             switch (property)
             {
             case ZenSensorProperty_DeviceName:
-                return GET_OR_V1(EDevicePropertyV1::GetSensorModel);
+                return get_or(EDevicePropertyV1::GetSensorModel);
 
             case ZenSensorProperty_FirmwareInfo:
-                return GET_OR_V1(EDevicePropertyV1::GetFirmwareInfo);
+                return get_or(EDevicePropertyV1::GetFirmwareInfo);
 
             case ZenSensorProperty_FirmwareVersion:
-                return GET_OR_V1(EDevicePropertyV1::GetFirmwareInfo);
+                return get_or(EDevicePropertyV1::GetFirmwareInfo);
 
             case ZenSensorProperty_SerialNumber:
-                return GET_OR_V1(EDevicePropertyV1::GetSerialNumber);
+                return get_or(EDevicePropertyV1::GetSerialNumber);
 
             case ZenSensorProperty_SensorModel:
-                return GET_OR_V1(EDevicePropertyV1::GetSensorModel);
+                return get_or(EDevicePropertyV1::GetSensorModel);
 
             default:
                 return EDevicePropertyV1::Ack;

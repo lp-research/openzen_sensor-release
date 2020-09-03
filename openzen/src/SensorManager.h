@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_SENSORMANAGER_H_
 #define ZEN_SENSORMANAGER_H_
 
@@ -9,7 +19,7 @@
 #include <thread>
 #include <type_traits>
 
-#ifdef ZEN_BLUETOOTH
+#ifdef ZEN_BLUETOOTH_BLE
 #include <QCoreApplication>
 #endif
 
@@ -82,7 +92,7 @@ namespace zen
         std::thread m_sensorThread;
         std::thread m_sensorDiscoveryThread;
 
-        #ifdef ZEN_BLUETOOTH
+        #ifdef ZEN_BLUETOOTH_BLE
         std::unique_ptr<QCoreApplication> m_app;
         #endif
     };

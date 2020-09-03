@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #include "GnssComponentFactory.h"
 
 #include <spdlog/spdlog.h>
@@ -14,6 +24,7 @@ namespace zen
 {
     nonstd::expected<std::unique_ptr<SensorComponent>, ZenSensorInitError> GnssComponentFactory::make_component(
         unsigned int version,
+        SpecialOptions,
         uint8_t,
         SyncedModbusCommunicator& communicator
     ) const noexcept

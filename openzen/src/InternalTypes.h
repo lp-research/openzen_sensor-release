@@ -1,3 +1,13 @@
+//===========================================================================//
+//
+// Copyright (C) 2020 LP-Research Inc.
+//
+// This file is part of OpenZen, under the MIT License.
+// See https://bitbucket.org/lpresearch/openzen/src/master/LICENSE for details
+// SPDX-License-Identifier: MIT
+//
+//===========================================================================//
+
 #ifndef ZEN_INTERNALTYPES_H_
 #define ZEN_INTERNALTYPES_H_
 
@@ -99,7 +109,10 @@ enum class EDevicePropertyV0 : DeviceProperty_t
     GetSerialNumber = 90,               // char[24]
     GetDeviceName = 91,                 // char[16]
     GetFirmwareInfo = 92,               // char[16]
-    
+
+    StartSync = 96,                     // void
+    StopSync = 97,                      // void
+
     GetPing = 98,                       // uint32
 
     SetCanBaudrate = 46,				// uint32

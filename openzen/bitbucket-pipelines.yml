@@ -2,7 +2,7 @@
 # -----
 # Custom Docker image which brings C++ compiler and boost libraries
 image:
-  name: thauth/buildbox-multi-platform:10
+  name: thauth/buildbox-multi-platform:15
   username: $DOCKER_HUB_USERNAME
   password: $DOCKER_HUB_PASSWORD
   email: $DOCKER_HUB_EMAIL
@@ -14,8 +14,15 @@ pipelines:
           script:
             - git submodule update --init
             - mkdir ../linux_x64_build && cd ../linux_x64_build
-            # disable most of optional components for now
             - cmake ../build
+            - make
+            - ./OpenZenTests
+      - step:
+          name: Linux x64 Unity Build Gcc
+          script:
+            - git submodule update --init
+            - mkdir ../linux_x64_build && cd ../linux_x64_build
+            - /opt/cmake-3.16.3-Linux-x86_64/bin/cmake -DCMAKE_UNITY_BUILD=TRUE ../build
             - make
             - ./OpenZenTests
       - step:
@@ -23,17 +30,23 @@ pipelines:
           script:
             - git submodule update --init
             - mkdir ../linux_x64_build && cd ../linux_x64_build
-            # disable most of optional components for now
             - cmake -DZEN_USE_STATIC_LIBS=ON ../build
             - make
-            - ./OpenZenTests            
+            - ./OpenZenTests
       - step:
           name: Linux x64 Build Clang
           script:
             - git submodule update --init
             - mkdir ../linux_x64_build && cd ../linux_x64_build
-            # disable most of optional components for now
-            - cmake -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CC_COMPILER=clang ../build
+            - cmake -DCMAKE_CXX_COMPILER=clang++-6.0 -DCMAKE_C_COMPILER=clang-6.0 ../build
+            - make
+            - ./OpenZenTests
+      - step:
+          name: Linux x64 Unity Build Clang
+          script:
+            - git submodule update --init
+            - mkdir ../linux_x64_build && cd ../linux_x64_build
+            - /opt/cmake-3.16.3-Linux-x86_64/bin/cmake -DCMAKE_UNITY_BUILD=TRUE -DCMAKE_CXX_COMPILER=clang++-6.0 -DCMAKE_C_COMPILER=clang-6.0 ../build
             - make
             - ./OpenZenTests
       - step:
@@ -41,17 +54,7 @@ pipelines:
           script:
             - git submodule update --init
             - mkdir ../linux_x64_build && cd ../linux_x64_build
-            # disable most of optional components for now
             - cmake -DZEN_NETWORK=ON ../build
-            - make
-            - ./OpenZenTests
-      - step:
-          name: Linux x64 Build no Bluetooth
-          script:
-            - git submodule update --init
-            - mkdir ../linux_x64_build_nobt && cd ../linux_x64_build_nobt
-            # disable most of optional components for now
-            - cmake -DZEN_BLUETOOTH=OFF ../build
             - make
             - ./OpenZenTests
       - step:
@@ -65,3 +68,54 @@ pipelines:
             - cmake -DCMAKE_INSTALL_PREFIX=../openzen_install ../build/standalone_example
             - make
             - ./OpenZenStandaloneExample
+  custom:
+    ubuntu-16-04-x64-release:
+      - step:
+          name: Linux x64 Ubuntu 16.04 Release
+          image:
+            name: thauth/buildbox-ubuntu-1604:2
+            username: $DOCKER_HUB_USERNAME
+            password: $DOCKER_HUB_PASSWORD
+            email: $DOCKER_HUB_EMAIL
+          script:
+            - git submodule update --init
+            - mkdir linux_x64_build_release && cd linux_x64_build_release
+            - /opt/cmake-3.16.3-Linux-x86_64/bin/cmake -DCMAKE_INSTALL_PREFIX=../openzen_release_build -DCMAKE_CXX_COMPILER=g++-7 -DCMAKE_C_COMPILER=gcc-7 -DZEN_STATIC_LINK_LIBCXX=ON ..
+            - make install
+            - cd .. && mkdir openzen_release && cd openzen_release
+            - sphinx-build ../docs docs/
+            # copy needed files into the release folder
+            - cp ../README.md .
+            - cp ../LICENSE .
+            - cp -rv ../openzen_release_build/lib/ .
+            - cp -rv ../openzen_release_build/include/ .
+            # compress
+            - cd .. && tar -zcvf openzen_release.tar.gz openzen_release
+          artifacts:
+            - openzen_release.tar.gz
+
+    ubuntu-16-04-arm64-release:
+      - step:
+          name: Linux arm64 Ubuntu 16.04 Release
+          image:
+            name: thauth/buildbox-ubuntu-1604:2
+            username: $DOCKER_HUB_USERNAME
+            password: $DOCKER_HUB_PASSWORD
+            email: $DOCKER_HUB_EMAIL
+          script:
+            - git submodule update --init
+            - export XCOMPILER_ROOT=/root/x-tools/aarch64-unknown-linux-gnu/
+            - mkdir linux_arm64_build_release && cd linux_arm64_build_release
+            - /opt/cmake-3.16.3-Linux-x86_64/bin/cmake -DCMAKE_INSTALL_PREFIX=../openzen_release_build -DCMAKE_SYSTEM_NAME=Linux -DCMAKE_SYSTEM_PROCESSOR=arm64 -DCMAKE_SYSTEM_VERSION=1 -DCMAKE_C_COMPILER=${XCOMPILER_ROOT}/bin/aarch64-unknown-linux-gnu-gcc -DCMAKE_CXX_COMPILER=${XCOMPILER_ROOT}/bin/aarch64-unknown-linux-gnu-g++ -DCMAKE_FIND_ROOT_PATH=${XCOMPILER_ROOT}/aarch64-unknown-linux-gnu/sysroot/ -DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY -DCMAKE_BUILD_TYPE=Release -DZEN_STATIC_LINK_LIBCXX=ON ..
+            - make install
+            - cd .. && mkdir openzen_release && cd openzen_release
+            - sphinx-build ../docs docs/
+            # copy needed files into the release folder
+            - cp ../README.md .
+            - cp ../LICENSE .
+            - cp -rv ../openzen_release_build/lib/ .
+            - cp -rv ../openzen_release_build/include/ .
+            # compress
+            - cd .. && tar -zcvf openzen_release.tar.gz openzen_release
+          artifacts:
+            - openzen_release.tar.gz
