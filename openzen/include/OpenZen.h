@@ -121,6 +121,8 @@ namespace zen
         ZenSensorHandle_t m_sensorHandle;
         ZenComponentHandle_t m_componentHandle;
 
+        static constexpr size_t m_getArrayBufferSize = 9;
+
     protected:
         ZenSensorComponent(ZenClientHandle_t clientHandle, ZenSensorHandle_t sensorHandle, ZenComponentHandle_t componentHandle) noexcept
             : m_clientHandle(clientHandle)
@@ -161,11 +163,7 @@ namespace zen
          * Returns the type name of this component. At this point, this method
          * will return either g_zenSensorType_Imu or g_zenSensorType_Gnss
          */
-#ifdef OPENZEN_CXX17
-        std::string_view type() const noexcept
-#else
-        const char* type() const noexcept
-#endif
+        std::string type() const noexcept
         {
             return ZenSensorComponentType(m_clientHandle, m_sensorHandle, m_componentHandle);
         }
@@ -182,12 +180,20 @@ namespace zen
         /**
          * Loads an array property from this sensor component
          */
-        template <typename T>
-        std::pair<ZenError, size_t> getArrayProperty(ZenProperty_t property, T* const array, size_t length) noexcept
+        template <class TDataType>
+        std::pair<ZenError, std::vector<TDataType>> getArrayProperty(ZenProperty_t property) noexcept
         {
-            auto result = std::make_pair(ZenError_None, length);
-            result.first = ZenSensorComponentGetArrayProperty(m_clientHandle, m_sensorHandle, m_componentHandle, property, details::PropertyType<T>::type::value, array, &result.second);
-            return result;
+            std::vector<TDataType> outputArray(m_getArrayBufferSize);
+
+            size_t outputSize = outputArray.size() * sizeof(TDataType);
+            auto error = ZenSensorComponentGetArrayProperty(m_clientHandle, m_sensorHandle, m_componentHandle,
+                property,
+                details::PropertyType<TDataType>::type::value,
+                outputArray.data(), &outputSize);
+            outputSize /= sizeof(TDataType);
+            // resize output size
+            outputArray.resize(outputSize);
+            return {error, outputArray};
         }
 
         /**
@@ -233,10 +239,12 @@ namespace zen
         /**
          * Sets an array property on this sensor component
          */
-        template <typename T>
-        ZenError setArrayProperty(ZenProperty_t property, const T* array, size_t length) noexcept
+        template <typename TDataType>
+        ZenError setArrayProperty(ZenProperty_t property, std::vector<TDataType> & inputArray) noexcept
         {
-            return ZenSensorComponentSetArrayProperty(m_clientHandle, m_sensorHandle, m_componentHandle, property, details::PropertyType<T>::type::value, array, length);
+            return ZenSensorComponentSetArrayProperty(m_clientHandle, m_sensorHandle, m_componentHandle, property,
+                details::PropertyType<TDataType>::type::value, inputArray.data(),
+                    inputArray.size() * sizeof(TDataType));
         }
 
         /**
@@ -283,10 +291,11 @@ namespace zen
          *
          *      component.forwardRtkCorrections("RTCM3Serial", "COM11", 57600)
          */
-        ZenError forwardRtkCorrections(const char* const rtkCorrectionSource,
-            const char* const hostname,
+        ZenError forwardRtkCorrections(std::string const& rtkCorrectionSource,
+            std::string const& hostname,
             uint32_t port) noexcept {
-            return ZenSensorComponentGnnsForwardRtkCorrections(m_clientHandle, m_sensorHandle, m_componentHandle, rtkCorrectionSource, hostname, port);
+            return ZenSensorComponentGnnsForwardRtkCorrections(m_clientHandle, m_sensorHandle, m_componentHandle,
+                rtkCorrectionSource.c_str(), hostname.c_str(), port);
         }
     };
 
@@ -302,6 +311,8 @@ namespace zen
     private:
         ZenClientHandle_t m_clientHandle;
         ZenSensorHandle_t m_sensorHandle;
+
+        static constexpr size_t m_getArrayBufferSize = 9;
 
     protected:
         ZenSensor(ZenClientHandle_t clientHandle, ZenSensorHandle_t sensorHandle)
@@ -332,7 +343,12 @@ namespace zen
          */
         ZenError release() noexcept
         {
-            return ZenReleaseSensor(m_clientHandle, m_sensorHandle);
+            auto err = ZenReleaseSensor(m_clientHandle, m_sensorHandle);
+            if (err == ZenError_None) {
+                // invalidate sensor handle if closing was successful
+                m_sensorHandle.handle = 0;
+            }
+            return err;
         }
 
         /** On first call, tries to initialises a firmware update, and returns an error on failure.
@@ -357,14 +373,7 @@ namespace zen
             return ZenSensorUpdateIAPAsync(m_clientHandle, m_sensorHandle, iap.data(), iap.size());
         }
 
-#ifdef OPENZEN_CXX17
-        /**
-         * Returns the IO sytem name used for this sensor connection
-         */
-        std::string_view ioType() const noexcept
-#else
-        const char* ioType() const noexcept
-#endif
+        std::string ioType() const noexcept
         {
             return ZenSensorIoType(m_clientHandle, m_sensorHandle);
         }
@@ -405,14 +414,21 @@ namespace zen
         /**
          * Loads an array property from this sensor component
          */
-        template <typename T>
-        std::pair<ZenError, size_t> getArrayProperty(ZenProperty_t property, T* const array, size_t length) noexcept
+        template <class TDataType>
+        std::pair<ZenError, std::vector<TDataType>> getArrayProperty(ZenProperty_t property) noexcept
         {
-            auto result = std::make_pair(ZenError_None, length);
-            result.first = ZenSensorGetArrayProperty(m_clientHandle, m_sensorHandle, property, details::PropertyType<T>::type::value, array, &result.second);
-            return result;
-        }
+            std::vector<TDataType> outputArray(m_getArrayBufferSize);
 
+            size_t outputSize = outputArray.size() * sizeof(TDataType);
+            auto error = ZenSensorGetArrayProperty(m_clientHandle, m_sensorHandle,
+                property,
+                details::PropertyType<TDataType>::type::value,
+                outputArray.data(), &outputSize);
+            outputSize /= sizeof(TDataType);
+            // resize output size
+            outputArray.resize(outputSize);
+            return {error, outputArray};
+        }
         /**
          * Loads a string property from this sensor component
          */
@@ -483,10 +499,12 @@ namespace zen
         /**
          * Sets an array property for this sensor component
          */
-        template <typename T>
-        ZenError setArrayProperty(ZenProperty_t property, const T* array, size_t length) noexcept
+        template <typename TDataType>
+        ZenError setArrayProperty(ZenProperty_t property, std::vector<TDataType> & inputArray) noexcept
         {
-            return ZenSensorSetArrayProperty(m_clientHandle, m_sensorHandle, property, details::PropertyType<T>::type::value, array, length);
+            return ZenSensorSetArrayProperty(m_clientHandle, m_sensorHandle, property,
+                details::PropertyType<TDataType>::type::value, inputArray.data(),
+                    inputArray.size() * sizeof(TDataType));
         }
 
         /**
@@ -521,17 +539,17 @@ namespace zen
             return ZenSensorSetUInt64Property(m_clientHandle, m_sensorHandle, property, value);
         }
 
-#ifdef OPENZEN_CXX17
         /**
          * Returns an instance of a sensor component on this sensor. type can be either
          * g_zenSensorType_Imu or g_zenSensorType_Gnss. If a requested sensor component
-         * is not available on a sensor, the std::optional object is empty.
+         * is not available on a sensor, the bool entry of the std::pair is false.
          */
-        std::optional<ZenSensorComponent> getAnyComponentOfType(std::string_view type) noexcept
+#ifdef OPENZEN_CXX17
+        std::optional<ZenSensorComponent> getAnyComponentOfType(std::string const& type) noexcept
         {
             ZenComponentHandle_t* handles = nullptr;
             size_t nComponents;
-            if (auto error = ZenSensorComponents(m_clientHandle, m_sensorHandle, type.data(), &handles, &nComponents))
+            if (ZenSensorComponents(m_clientHandle, m_sensorHandle, type.c_str(), &handles, &nComponents) != ZenError_None)
                 return std::nullopt;
 
             if (nComponents == 0)
@@ -540,16 +558,11 @@ namespace zen
             return ZenSensorComponent(m_clientHandle, m_sensorHandle, handles[0]);
         }
 #else
-        /**
-         * Returns an instance of a sensor component on this sensor. type can be either
-         * g_zenSensorType_Imu or g_zenSensorType_Gnss. If a requested sensor component
-         * is not available on a sensor, the bool entry of the std::pair is false.
-         */
-        std::pair<bool, ZenSensorComponent> getAnyComponentOfType(const char* type) noexcept
+        std::pair<bool, ZenSensorComponent> getAnyComponentOfType(std::string const& type) noexcept
         {
             ZenComponentHandle_t* handles = nullptr;
             size_t nComponents;
-            if (auto error = ZenSensorComponents(m_clientHandle, m_sensorHandle, type, &handles, &nComponents))
+            if (auto error = ZenSensorComponents(m_clientHandle, m_sensorHandle, type.c_str(), &handles, &nComponents))
                 return std::make_pair(false, ZenSensorComponent(m_clientHandle, m_sensorHandle, ZenComponentHandle_t{ 0 }));
 
             if (nComponents == 0)
@@ -595,7 +608,12 @@ namespace zen
          */
         ZenError close() noexcept
         {
-            return ZenShutdown(m_handle);
+            auto err = ZenShutdown(m_handle);
+            if (err == ZenError_None) {
+                // invalidate client handle if closing was successful
+                m_handle.handle = 0;
+            }
+            return err;
         }
 
         /** call the method ZenClient::listSensorsAsync to start the query for available sensors.
@@ -672,7 +690,7 @@ namespace zen
             if (ZenPollNextEvent(m_handle, &event))
             {
 #ifdef OPENZEN_CXX17
-                return std::move(event);
+                return event;
 #else
                 return std::make_pair(true, std::move(event));
 #endif
@@ -711,7 +729,7 @@ namespace zen
             if (ZenWaitForNextEvent(m_handle, &event))
             {
 #ifdef OPENZEN_CXX17
-                return std::move(event);
+                return event;
 #else
                 return std::make_pair(true, std::move(event));
 #endif

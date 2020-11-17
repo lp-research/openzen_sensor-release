@@ -256,6 +256,9 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
             return getInt32AsBool(property);
         else if (property == ZenImuProperty_GyrUseThreshold)
             return getInt32AsBool(property);
+        else if (property == ZenImuProperty_DegRadOutput)
+            // is cached
+            return m_cache.degGradOutput;
         else if (property == ZenImuProperty_OutputLinearAcc)
             return getOutputDataFlag<ZenImuProperty_OutputLinearAcc>(m_cache.outputDataBitset);
         else if (property == ZenImuProperty_OutputAltitude)
@@ -407,8 +410,13 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
                 notifyPropertyChange(property, value);
             }
             return ZenError_None;
-        }
-        else if (property == ZenImuProperty_GyrUseAutoCalibration)
+        } else if (property == ZenImuProperty_DegRadOutput) {
+            auto cmdError = setInt32AsBool(ZenImuProperty_DegRadOutput, value);
+            if (cmdError == ZenError_None) {
+                m_cache.degGradOutput = value;
+            }
+            return cmdError;
+        } else if (property == ZenImuProperty_GyrUseAutoCalibration)
             return setInt32AsBool(ZenImuProperty_GyrUseAutoCalibration, value);
         else if (property == ZenImuProperty_GyrUseThreshold)
             return setInt32AsBool(ZenImuProperty_GyrUseThreshold, value);
@@ -593,6 +601,7 @@ template <> struct OutputDataFlag<ZenImuProperty_OutputLowPrecision>
         case ZenImuProperty_StreamData:
         case ZenImuProperty_GyrUseAutoCalibration:
         case ZenImuProperty_GyrUseThreshold:
+        case ZenImuProperty_DegRadOutput:
         case ZenImuProperty_OutputLowPrecision:
         case ZenImuProperty_OutputRawAcc:
         case ZenImuProperty_OutputRawGyr:
