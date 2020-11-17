@@ -1,3 +1,26 @@
+## openzen_sensor (melodic) - 1.2.0-1
+
+The packages in the `openzen_sensor` repository were released into the `melodic` distro by running `/usr/bin/bloom-release --rosdistro melodic openzen_sensor` on `Tue, 17 Nov 2020 04:54:35 -0000`
+
+The `openzen_sensor` package was released.
+
+Version of package(s) in repository `openzen_sensor`:
+
+- upstream repository: https://bitbucket.org/lpresearch/openzenros.git
+- release repository: https://github.com/lp-research/openzen_sensor-release.git
+- rosdistro version: `1.0.1-2`
+- old version: `1.0.1-2`
+- new version: `1.2.0-1`
+
+Versions of tools used:
+
+- bloom version: `0.10.0`
+- catkin_pkg version: `0.4.23`
+- rosdep version: `0.19.0`
+- rosdistro version: `0.8.3`
+- vcstools version: `0.1.42`
+
+
 ## openzen_sensor (melodic) - 1.0.1-2
 
 The packages in the `openzen_sensor` repository were released into the `melodic` distro by running `/usr/bin/bloom-release openzen_sensor --rosdistro melodic` on `Thu, 03 Sep 2020 07:35:40 -0000`
