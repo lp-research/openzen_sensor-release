@@ -46,7 +46,7 @@ class wss_engine_t : public ws_engine_t
                   ws_address_t &address_,
                   bool client_,
                   void *tls_server_cred_,
-                  const char *hostname_);
+                  const std::string &hostname_);
     ~wss_engine_t ();
 
     void out_event ();
@@ -57,8 +57,9 @@ class wss_engine_t : public ws_engine_t
     int read (void *data, size_t size_);
     int write (const void *data_, size_t size_);
 
-
   private:
+    bool do_handshake ();
+
     bool _established;
     gnutls_certificate_credentials_t _tls_client_cred;
     gnutls_session_t _tls_session;

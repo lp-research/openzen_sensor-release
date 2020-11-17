@@ -59,11 +59,11 @@ namespace zen
         }
     }
 
-    nonstd::expected<ZenEventData, ZenError> ImuIg1Component::processEventData(ZenEvent_t eventType, gsl::span<const std::byte> data) noexcept
+    nonstd::expected<ZenEventData, ZenError> ImuIg1Component::processEventData(ZenEventType eventType, gsl::span<const std::byte> data) noexcept
     {
         switch (eventType)
         {
-        case ZenImuEvent_Sample:
+        case ZenEventType_ImuData:
             return parseSensorData(data);
             break;
 
@@ -76,6 +76,10 @@ namespace zen
     {
         // Any properties that are retrieved here should be cached locally, because it
         // will take too much time to retrieve from the sensor!
+
+        // Units will always be converted to degrees and degrees/s no matter how the
+        // IG1 output is actually configured. OpenZen output unit is always degrees
+
         ZenEventData eventData;
         ZenImuData& imuData = eventData.imuData;
         imuDataReset(imuData);
@@ -107,8 +111,9 @@ namespace zen
         }
 
         if (auto enabled = sensor_parsing_util::readVector3IfAvailable(ZenImuProperty_OutputRawGyr0,
-            m_properties, data, &imuData.gRaw[0])) {}
-        else {
+            m_properties, data, &imuData.gRaw[0])) {
+            sensor_parsing_util::radToDegreesIfNeededVector3(m_properties, &imuData.gRaw[0]);
+        } else {
             return nonstd::make_unexpected(enabled.error());
         }
 
@@ -118,7 +123,9 @@ namespace zen
             secondGyroTargetRaw = &imuData.gRaw[0];
         }
         if (auto enabled = sensor_parsing_util::readVector3IfAvailable(ZenImuProperty_OutputRawGyr1,
-            m_properties, data, secondGyroTargetRaw)) {}
+            m_properties, data, secondGyroTargetRaw)) {
+            sensor_parsing_util::radToDegreesIfNeededVector3(m_properties, secondGyroTargetRaw);
+            }
         else {
             return nonstd::make_unexpected(enabled.error());
         }
@@ -137,7 +144,9 @@ namespace zen
 
         // alignment calibration also contains the static calibration correction
         if (auto enabled = sensor_parsing_util::readVector3IfAvailable(ZenImuProperty_OutputGyr0AlignCalib,
-            m_properties, data, &imuData.g[0])) {}
+            m_properties, data, &imuData.g[0])) {
+                sensor_parsing_util::radToDegreesIfNeededVector3(m_properties, &imuData.g[0]);
+            }
         else {
             return nonstd::make_unexpected(enabled.error());
         }
@@ -148,7 +157,9 @@ namespace zen
             secondGyroTarget = &imuData.g[0];
         }
         if (auto enabled = sensor_parsing_util::readVector3IfAvailable(ZenImuProperty_OutputGyr1AlignCalib,
-            m_properties, data, secondGyroTarget)) {}
+            m_properties, data, secondGyroTarget)) {
+                sensor_parsing_util::radToDegreesIfNeededVector3(m_properties, secondGyroTarget);
+            }
         else {
             return nonstd::make_unexpected(enabled.error());
         }
@@ -165,8 +176,12 @@ namespace zen
             return nonstd::make_unexpected(enabled.error());
         }
 
+        // this is the angular velocity which takes into account when an orientation offset was
+        // done
         if (auto enabled = sensor_parsing_util::readVector3IfAvailable(ZenImuProperty_OutputAngularVel,
-            m_properties, data, &imuData.w[0])) {}
+            m_properties, data, &imuData.w[0])) {
+                sensor_parsing_util::radToDegreesIfNeededVector3(m_properties, &imuData.w[0]);
+            }
         else {
             return nonstd::make_unexpected(enabled.error());
         }
@@ -178,7 +193,9 @@ namespace zen
         }
 
         if (auto enabled = sensor_parsing_util::readVector3IfAvailable(ZenImuProperty_OutputEuler,
-            m_properties, data, &imuData.r[0])) {}
+            m_properties, data, &imuData.r[0])) {
+                sensor_parsing_util::radToDegreesIfNeededVector3(m_properties, &imuData.r[0]);
+            }
         else {
             return nonstd::make_unexpected(enabled.error());
         }

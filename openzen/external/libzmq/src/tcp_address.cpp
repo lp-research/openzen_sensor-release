@@ -75,7 +75,7 @@ int zmq::tcp_address_t::resolve (const char *name_, bool local_, bool ipv6_)
     // Test the ';' to know if we have a source address in name_
     const char *src_delimiter = strrchr (name_, ';');
     if (src_delimiter) {
-        std::string src_name (name_, src_delimiter - name_);
+        const std::string src_name (name_, src_delimiter - name_);
 
         ip_resolver_options_t src_resolver_opts;
 
@@ -113,23 +113,23 @@ int zmq::tcp_address_t::resolve (const char *name_, bool local_, bool ipv6_)
 }
 
 template <size_t N1, size_t N2>
-static std::string make_address_string (const char *hbuf,
-                                        uint16_t port,
-                                        const char (&ipv6_prefix)[N1],
-                                        const char (&ipv6_suffix)[N2])
+static std::string make_address_string (const char *hbuf_,
+                                        uint16_t port_,
+                                        const char (&ipv6_prefix_)[N1],
+                                        const char (&ipv6_suffix_)[N2])
 {
     const size_t max_port_str_length = 5;
-    char buf[NI_MAXHOST + sizeof ipv6_prefix + sizeof ipv6_suffix
+    char buf[NI_MAXHOST + sizeof ipv6_prefix_ + sizeof ipv6_suffix_
              + max_port_str_length];
     char *pos = buf;
-    memcpy (pos, ipv6_prefix, sizeof ipv6_prefix - 1);
-    pos += sizeof ipv6_prefix - 1;
-    const size_t hbuf_len = strlen (hbuf);
-    memcpy (pos, hbuf, hbuf_len);
+    memcpy (pos, ipv6_prefix_, sizeof ipv6_prefix_ - 1);
+    pos += sizeof ipv6_prefix_ - 1;
+    const size_t hbuf_len = strlen (hbuf_);
+    memcpy (pos, hbuf_, hbuf_len);
     pos += hbuf_len;
-    memcpy (pos, ipv6_suffix, sizeof ipv6_suffix - 1);
-    pos += sizeof ipv6_suffix - 1;
-    pos += sprintf (pos, "%d", ntohs (port));
+    memcpy (pos, ipv6_suffix_, sizeof ipv6_suffix_ - 1);
+    pos += sizeof ipv6_suffix_ - 1;
+    pos += sprintf (pos, "%d", ntohs (port_));
     return std::string (buf, pos - buf);
 }
 
@@ -203,11 +203,6 @@ zmq::tcp_address_mask_t::tcp_address_mask_t () : _address_mask (-1)
     memset (&_network_address, 0, sizeof (_network_address));
 }
 
-int zmq::tcp_address_mask_t::mask () const
-{
-    return _address_mask;
-}
-
 int zmq::tcp_address_mask_t::resolve (const char *name_, bool ipv6_)
 {
     // Find '/' at the end that separates address from the cidr mask number.
@@ -261,53 +256,6 @@ int zmq::tcp_address_mask_t::resolve (const char *name_, bool ipv6_)
         _address_mask = static_cast<int> (mask);
     }
 
-    return 0;
-}
-
-int zmq::tcp_address_mask_t::to_string (std::string &addr_) const
-{
-    if (_network_address.family () != AF_INET
-        && _network_address.family () != AF_INET6) {
-        addr_.clear ();
-        return -1;
-    }
-    if (_address_mask == -1) {
-        addr_.clear ();
-        return -1;
-    }
-
-    char hbuf[NI_MAXHOST];
-    const int rc = getnameinfo (_network_address.as_sockaddr (),
-                                _network_address.sockaddr_len (), hbuf,
-                                sizeof (hbuf), NULL, 0, NI_NUMERICHOST);
-    if (rc != 0) {
-        addr_.clear ();
-        return rc;
-    }
-
-    const size_t max_mask_len = 4;
-    const char ipv6_prefix[] = "[";
-    const char ipv6_suffix[] = "]/";
-    const char ipv4_suffix[] = "/";
-    char
-      buf[NI_MAXHOST + sizeof ipv6_prefix + sizeof ipv6_suffix + max_mask_len];
-    char *pos = buf;
-    if (_network_address.family () == AF_INET6) {
-        memcpy (pos, ipv6_prefix, sizeof ipv6_prefix - 1);
-        pos += sizeof ipv6_prefix - 1;
-    }
-    const size_t hbuf_len = strlen (hbuf);
-    memcpy (pos, hbuf, hbuf_len);
-    pos += hbuf_len;
-    if (_network_address.family () == AF_INET6) {
-        memcpy (pos, ipv6_suffix, sizeof ipv6_suffix - 1);
-        pos += sizeof ipv6_suffix - 1;
-    } else {
-        memcpy (pos, ipv4_suffix, sizeof ipv4_suffix - 1);
-        pos += sizeof ipv4_suffix - 1;
-    }
-    pos += sprintf (pos, "%d", _address_mask);
-    addr_.assign (buf, pos - buf);
     return 0;
 }
 

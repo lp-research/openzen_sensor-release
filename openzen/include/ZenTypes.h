@@ -55,8 +55,8 @@ typedef int ZenError_t;
 
 typedef enum ZenError
 {
-    ZenError_None = 0,                       // None
-    ZenError_Unknown = 1,                    // Unknown
+    ZenError_None = 0,                       // Not error reported
+    ZenError_Unknown = 1,                    // Unkown error occured
 
     ZenError_IsNull = 10,                    // Pointer is invalid (null)
     ZenError_NotNull = 11,                   // Expected a null pointer
@@ -99,7 +99,6 @@ typedef enum ZenError
     ZenError_UnknownCommandMode = 851,       // Sensor does not support the command mode
     ZenError_UnsupportedEvent = 852,        // Host does not support the event type
 
-    // [XXX] What to do with other errors in the hardware?
     ZenError_FW_FunctionFailed = 900,        // Firmware failed to execute the requested function
 
     ZenError_Can_BusError = 1001,            // Can interface is in an error state
@@ -116,7 +115,7 @@ typedef enum ZenError
 
 typedef enum ZenSensorInitError
 {
-    ZenSensorInitError_None = 0,
+    ZenSensorInitError_None = 0,                // No error reported
 
     ZenSensorInitError_InvalidHandle,           // Provided client handle is invalid
     ZenSensorInitError_IsNull,                  // Provided pointer is null
@@ -164,69 +163,86 @@ typedef enum ZenLogLevel
     ZenLogLevel_Max
 } ZenLogLevel;
 
-typedef struct ZenHeaveMotionData
-{
-    float yHeave;
-} ZenHeaveMotionData;
-
 typedef struct ZenImuData
 {
+    /// Index of the data frame.
+    /// Unit: no unit
+    int frameCount;
+
+    /// Sampling time of the data in seconds
+    /// Unit: s
+    double timestamp;
+
     /// Calibrated accelerometer sensor data.
+    /// Unit: m/s^2
     float a[3];
 
     /// Calibrated gyroscope sensor data.
+    /// Unit: degree/s
     float g[3];
 
     /// Calibrated magnetometer sensor data.
+    /// Unit: micro Tesla
     float b[3];
 
     /// Raw accelerometer sensor data.
+    /// Unit: m/s^2
     float aRaw[3];
 
     /// Raw gyroscope sensor data.
+    /// Unit: degree/s
     float gRaw[3];
 
     /// Raw magnetometer sensor data.
+    /// Unit: micro Tesla
     float bRaw[3];
 
     /// Angular velocity data.
+    /// This angular velocity takes into account if an orientation offset
+    /// has been set while the g and gRaw values in this struct
+    /// do not.
     float w[3];
 
     /// Euler angle data.
+    /// Unit: degree/s
     float r[3];
 
     /// Quaternion orientation data.
     /// The component order is w, x, y, z
+    /// Unit: no unit
     float q[4];
 
     /// Orientation data as rotation matrix without offset.
+    /// Unit: no unit
     float rotationM[9];
 
     /// Orientation data as rotation matrix after zeroing.
+    /// Unit: no unit
     float rotOffsetM[9];
 
     /// Barometric pressure.
+    /// Unit: mPascal
     float pressure;
 
-    /// Index of the data frame.
-    int frameCount;
-
     /// Linear acceleration x, y and z.
+    /// Unit: m/s^2
     float linAcc[3];
 
     /// Gyroscope temperature.
+    /// Unit: Degree Celcius
     float gTemp;
 
     /// Altitude.
+    /// Unit: m
     float altitude;
 
     /// Temperature.
+    /// Unit: Degree Celcius
     float temperature;
 
-    /// Sampling time of the data in seconds
-    double timestamp;
-
-    ZenHeaveMotionData hm;
+    /// heave motion
+    /// Unit: m
+    float heaveMotion;
 } ZenImuData;
 
 typedef ZenImuData ZenEventData_Imu;
@@ -251,9 +267,9 @@ typedef enum ZenGnssFixType
 
     /// Position estimation was done using a combination of an up-to-date
     /// GNSS position measurement and dead reckoning
-    ZenGnssFixType_GnnsAndDeadReckoning = 4,
+    ZenGnssFixType_GnssAndDeadReckoning = 4,
 
-    /// Only the time and date was obtained from the GNNS so far.
+    /// Only the time and date was obtained from the GNSS so far.
     ZenGnssFixType_TimeOnlyFix = 5,
 
     ZenGnssFixType_Max
@@ -282,6 +298,9 @@ the IMU sensors.
 */
 typedef struct ZenGnssData
 {
+    /// Index of the data frame.
+    int frameCount;
+
     /// Sampling time of the data in seconds
     double timestamp;
 
@@ -354,7 +373,7 @@ typedef struct ZenGnssData
     /// All the date and time values above are rounded
     /// so they can be represented as integeres. This
     /// is the time in nanoseconds that the above date & time values need
-    /// to be shifted to give to exact time measured by the GNSS receiver.
+    /// to be shifted to arrive at the exact time measured by the GNSS receiver.
     int32_t nanoSecondCorrection;
 
 } ZenGnssData;
@@ -417,59 +436,40 @@ typedef union
     ZenEventData_SensorListingProgress sensorListingProgress;
 } ZenEventData;
 
-typedef int ZenEvent_t;
+typedef enum ZenEventType
+{
+    ZenEventType_None = 0,
+
+    ZenEventType_SensorFound = 1,
+    ZenEventType_SensorListingProgress = 2,
+    ZenEventType_SensorDisconnected = 3,
+
+    ZenEventType_ImuData = 100,
+
+    ZenEventType_GnssData = 200,
+
+    // Sensors are free to expose private events in this reserved region
+    ZenEventType_SensorSpecific_Start = 1000,
+    ZenEventType_SensorSpecific_End = 1999,
+
+    // IMU Components are free to expose private events in this reserved region
+    ZenEventType_ImuComponentSpecific_Start = 2000,
+    ZenEventType_ImuComponentSpecific_End = 2999,
+
+    // Components are free to expose private events in this reserved region
+    ZenEventType_GnssComponentSpecific_Start = 3000,
+    ZenEventType_GnssComponentSpecific_End = 3999,
+
+    ZenEventType_Max
+} ZenEventType;
 
 typedef struct ZenEvent
 {
-    ZenEvent_t eventType;
+    ZenEventType eventType;
     ZenSensorHandle_t sensor;
     ZenComponentHandle_t component;
     ZenEventData data;
 } ZenEvent;
-
-typedef enum ZenSensorEvent
-{
-    ZenSensorEvent_None = 0,
-
-    ZenSensorEvent_SensorFound = 1,
-    ZenSensorEvent_SensorListingProgress = 2,
-    ZenSensorEvent_SensorDisconnected = 3,
-
-    // Sensors are free to expose private events in this reserved region
-    ZenSensorEvent_SensorSpecific_Start = 10000,
-    ZenSensorEvent_SensorSpecific_End = 19999,
-
-    ZenSensorEvent_Max
-} ZenSensorEvent;
-
-typedef enum ZenImuEvent
-{
-    ZenImuEvent_None = 0,
-
-    ZenImuEvent_Sample = 1,
-
-    // Components are free to expose private events in this reserved region
-    ZenImuEvent_ComponentSpecific_Start = 10000,
-    ZenImuEvent_ComponentSpecific_End = 19999,
-
-    ZenImuEvent_Max
-} ZenImuEvent;
-
-/**
-Measurement event of the Global navigation satellite system
-*/
-typedef enum ZenGnssEvent
-{
-    ZenGnssEvent_None = 0,
-
-    ZenGnssEvent_Sample = 1,
-
-    // Components are free to expose private events in this reserved region
-    ZenGnssEvent_ComponentSpecific_Start = 10000,
-    ZenGnssEvent_ComponentSpecific_End = 19999,
-
-    ZenGnssEvent_Max
-} ZenGnssEvent;
 
 typedef int ZenProperty_t;
 
@@ -568,6 +568,13 @@ typedef enum EZenImuProperty
     ZenImuProperty_OutputGyr1AlignCalib,         // bool
     ZenImuProperty_OutputMagCalib,               // bool
 
+    /* switch between degrees or radian output (only for IG1 and newer) */
+    /* If set to true, radians will be used as output unit */
+    /* If set to false, degrees will be used as output unit */
+    /* OpenZen will automatically convert to degrees in case the unit is set to */
+    /* before outputting values to the user.*/
+    ZenImuProperty_DegRadOutput,                 // bool
+
     /* CAN bus properties */
     ZenImuProperty_CanChannelMode,
     ZenImuProperty_CanPointMode,
@@ -591,52 +598,52 @@ typedef enum EZenGnssProperty
 {
     ZenGnssProperty_Invalid = 0,
 
-    ZenGnnsProperty_OutputNavPvtiTOW,
-    ZenGnnsProperty_OutputNavPvtYear,
-    ZenGnnsProperty_OutputNavPvtMonth,
-    ZenGnnsProperty_OutputNavPvtDay,
-    ZenGnnsProperty_OutputNavPvtHour,
-    ZenGnnsProperty_OutputNavPvtMinute,
-    ZenGnnsProperty_OutputNavPvtSecond,
-    ZenGnnsProperty_OutputNavPvtValid,
-    ZenGnnsProperty_OutputNavPvttAcc,
-    ZenGnnsProperty_OutputNavPvtNano,
-    ZenGnnsProperty_OutputNavPvtFixType,
-    ZenGnnsProperty_OutputNavPvtFlags,
-    ZenGnnsProperty_OutputNavPvtFlags2,
-    ZenGnnsProperty_OutputNavPvtNumSV,
-    ZenGnnsProperty_OutputNavPvtLongitude,
-    ZenGnnsProperty_OutputNavPvtLatitude,
-    ZenGnnsProperty_OutputNavPvtHeight,
-    ZenGnnsProperty_OutputNavPvthMSL,
-    ZenGnnsProperty_OutputNavPvthAcc,
-    ZenGnnsProperty_OutputNavPvtvAcc,
-    ZenGnnsProperty_OutputNavPvtVelN,
-    ZenGnnsProperty_OutputNavPvtVelE,
-    ZenGnnsProperty_OutputNavPvtVelD,
-    ZenGnnsProperty_OutputNavPvtgSpeed,
-    ZenGnnsProperty_OutputNavPvtHeadMot,
-    ZenGnnsProperty_OutputNavPvtsAcc,
-    ZenGnnsProperty_OutputNavPvtHeadAcc,
-    ZenGnnsProperty_OutputNavPvtpDOP,
-    ZenGnnsProperty_OutputNavPvtHeadVeh,
+    ZenGnssProperty_OutputNavPvtiTOW,
+    ZenGnssProperty_OutputNavPvtYear,
+    ZenGnssProperty_OutputNavPvtMonth,
+    ZenGnssProperty_OutputNavPvtDay,
+    ZenGnssProperty_OutputNavPvtHour,
+    ZenGnssProperty_OutputNavPvtMinute,
+    ZenGnssProperty_OutputNavPvtSecond,
+    ZenGnssProperty_OutputNavPvtValid,
+    ZenGnssProperty_OutputNavPvttAcc,
+    ZenGnssProperty_OutputNavPvtNano,
+    ZenGnssProperty_OutputNavPvtFixType,
+    ZenGnssProperty_OutputNavPvtFlags,
+    ZenGnssProperty_OutputNavPvtFlags2,
+    ZenGnssProperty_OutputNavPvtNumSV,
+    ZenGnssProperty_OutputNavPvtLongitude,
+    ZenGnssProperty_OutputNavPvtLatitude,
+    ZenGnssProperty_OutputNavPvtHeight,
+    ZenGnssProperty_OutputNavPvthMSL,
+    ZenGnssProperty_OutputNavPvthAcc,
+    ZenGnssProperty_OutputNavPvtvAcc,
+    ZenGnssProperty_OutputNavPvtVelN,
+    ZenGnssProperty_OutputNavPvtVelE,
+    ZenGnssProperty_OutputNavPvtVelD,
+    ZenGnssProperty_OutputNavPvtgSpeed,
+    ZenGnssProperty_OutputNavPvtHeadMot,
+    ZenGnssProperty_OutputNavPvtsAcc,
+    ZenGnssProperty_OutputNavPvtHeadAcc,
+    ZenGnssProperty_OutputNavPvtpDOP,
+    ZenGnssProperty_OutputNavPvtHeadVeh,
 
-    ZenGnnsProperty_OutputNavAttiTOW,
-    ZenGnnsProperty_OutputNavAttVersion,
-    ZenGnnsProperty_OutputNavAttRoll,
-    ZenGnnsProperty_OutputNavAttPitch,
-    ZenGnnsProperty_OutputNavAttHeading,
-    ZenGnnsProperty_OutputNavAttAccRoll,
-    ZenGnnsProperty_OutputNavAttAccPitch,
-    ZenGnnsProperty_OutputNavAttAccHeading,
+    ZenGnssProperty_OutputNavAttiTOW,
+    ZenGnssProperty_OutputNavAttVersion,
+    ZenGnssProperty_OutputNavAttRoll,
+    ZenGnssProperty_OutputNavAttPitch,
+    ZenGnssProperty_OutputNavAttHeading,
+    ZenGnssProperty_OutputNavAttAccRoll,
+    ZenGnssProperty_OutputNavAttAccPitch,
+    ZenGnssProperty_OutputNavAttAccHeading,
 
-    ZenGnnsProperty_OutputEsfStatusiTOW,
-    ZenGnnsProperty_OutputEsfStatusVersion,
-    ZenGnnsProperty_OutputEsfStatusInitStatus1,
-    ZenGnnsProperty_OutputEsfStatusInitStatus2,
-    ZenGnnsProperty_OutputEsfStatusFusionMode,
-    ZenGnnsProperty_OutputEsfStatusNumSens,
-    ZenGnnsProperty_OutputEsfStatusSensStatus,
+    ZenGnssProperty_OutputEsfStatusiTOW,
+    ZenGnssProperty_OutputEsfStatusVersion,
+    ZenGnssProperty_OutputEsfStatusInitStatus1,
+    ZenGnssProperty_OutputEsfStatusInitStatus2,
+    ZenGnssProperty_OutputEsfStatusFusionMode,
+    ZenGnssProperty_OutputEsfStatusNumSens,
+    ZenGnssProperty_OutputEsfStatusSensStatus,
 
     ZenGnssProperty_Max
 } EZenGnssProperty;
