@@ -59,17 +59,17 @@ zmq::ws_decoder_t::ws_decoder_t (size_t bufsize_,
 
 zmq::ws_decoder_t::~ws_decoder_t ()
 {
-    int rc = _in_progress.close ();
+    const int rc = _in_progress.close ();
     errno_assert (rc == 0);
 }
 
 int zmq::ws_decoder_t::opcode_ready (unsigned char const *)
 {
-    bool final = (_tmpbuf[0] & 0x80) != 0; // final bit
+    const bool final = (_tmpbuf[0] & 0x80) != 0; // final bit
     if (!final)
         return -1; // non final messages are not supported
 
-    _opcode = (zmq::ws_protocol_t::opcode_t) (_tmpbuf[0] & 0xF);
+    _opcode = static_cast<zmq::ws_protocol_t::opcode_t> (_tmpbuf[0] & 0xF);
 
     _msg_flags = 0;
 
@@ -77,13 +77,13 @@ int zmq::ws_decoder_t::opcode_ready (unsigned char const *)
         case zmq::ws_protocol_t::opcode_binary:
             break;
         case zmq::ws_protocol_t::opcode_close:
-            _msg_flags = msg_t::command; // TODO: set the command name to CLOSE
+            _msg_flags = msg_t::command | msg_t::close_cmd;
             break;
         case zmq::ws_protocol_t::opcode_ping:
-            _msg_flags = msg_t::ping;
+            _msg_flags = msg_t::ping | msg_t::command;
             break;
         case zmq::ws_protocol_t::opcode_pong:
-            _msg_flags = msg_t::pong;
+            _msg_flags = msg_t::pong | msg_t::command;
             break;
         default:
             return -1;
@@ -96,12 +96,12 @@ int zmq::ws_decoder_t::opcode_ready (unsigned char const *)
 
 int zmq::ws_decoder_t::size_first_byte_ready (unsigned char const *read_from_)
 {
-    bool is_masked = (_tmpbuf[0] & 0x80) != 0;
+    const bool is_masked = (_tmpbuf[0] & 0x80) != 0;
 
     if (is_masked != _must_mask) // wrong mask value
         return -1;
 
-    _size = (uint64_t) (_tmpbuf[0] & 0x7F);
+    _size = static_cast<uint64_t> (_tmpbuf[0] & 0x7F);
 
     if (_size < 126) {
         if (_must_mask)
@@ -212,10 +212,13 @@ int zmq::ws_decoder_t::size_ready (unsigned char const *read_pos_)
     // data into a new message and complete it in the next receive.
 
     shared_message_memory_allocator &allocator = get_allocator ();
-    if (unlikely (!_zero_copy
-                  || _size > (size_t) (allocator.data () + allocator.size ()
-                                       - read_pos_))) {
+    if (unlikely (!_zero_copy || allocator.data () > read_pos_
+                  || static_cast<size_t> (read_pos_ - allocator.data ())
+                       > allocator.size ()
+                  || _size > static_cast<size_t> (
+                       allocator.data () + allocator.size () - read_pos_))) {
         // a new message has started, but the size would exceed the pre-allocated arena
+        // (or read_pos_ is in the initial handshake buffer)
         // this happens every time when a message does not fit completely into the buffer
         rc = _in_progress.init_size (static_cast<size_t> (_size));
     } else {
@@ -260,7 +263,8 @@ int zmq::ws_decoder_t::message_ready (unsigned char const *)
     if (_must_mask) {
         int mask_index = _opcode == ws_protocol_t::opcode_binary ? 1 : 0;
 
-        unsigned char *data = (unsigned char *) _in_progress.data ();
+        unsigned char *data =
+          static_cast<unsigned char *> (_in_progress.data ());
         for (size_t i = 0; i < _size; ++i, mask_index++)
             data[i] = data[i] ^ _mask[mask_index % 4];
     }
