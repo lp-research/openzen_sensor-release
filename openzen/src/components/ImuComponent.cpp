@@ -168,11 +168,11 @@ namespace zen
         }
     }
 
-    nonstd::expected<ZenEventData, ZenError> ImuComponent::processEventData(ZenEvent_t eventType, gsl::span<const std::byte> data) noexcept
+    nonstd::expected<ZenEventData, ZenError> ImuComponent::processEventData(ZenEventType eventType, gsl::span<const std::byte> data) noexcept
     {
         switch (eventType)
         {
-        case ZenImuEvent_Sample:
+        case ZenEventType_ImuData:
             return parseSensorData(data);
 
         default:
@@ -291,6 +291,8 @@ namespace zen
                 return nonstd::make_unexpected(enabled.error());;
             }
 
+            // this is the angular velocity which takes into account when an orientation offset was
+            // done
             if (auto enabled = m_properties->getBool(ZenImuProperty_OutputAngularVel))
             {
                 if (*enabled)
@@ -429,7 +431,7 @@ namespace zen
                         return nonstd::make_unexpected(ZenError_Io_MsgCorrupt);
                     }
 
-                    imuData.hm.yHeave = *lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data);
+                    imuData.heaveMotion = *lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data);
                 }
             }
             else

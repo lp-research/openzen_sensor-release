@@ -44,7 +44,7 @@ namespace zen
             config.c_cflag |= CREAD;              // enable reading
             config.c_cflag &= ~(PARENB | PARODD); // disable parity
             config.c_cflag &= ~CSTOPB;            // one stop bit
-            config.c_cc[VMIN] = 0;                // read doesnÂ´t block
+            config.c_cc[VMIN] = 0;                // read doesn´t block
             config.c_cc[VTIME] = 5;               // 0.5 seconds read timeout
 
             if (-1 == ::tcsetattr(fd, TCSANOW, &config))

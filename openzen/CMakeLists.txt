@@ -29,7 +29,7 @@ if (MSVC)
 endif()
 
 if (CMAKE_COMPILER_IS_GNUCC AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
-    message(FATAL_ERROR "GCC Version 7.0 is at least need to compile OpenZen")
+    message(FATAL_ERROR "GCC Version 7.0 or newer is needed to compile OpenZen")
 endif()
 
 set (ZEN_BLUETOOTH_DEFAULT ON)
@@ -76,6 +76,15 @@ option(ZEN_USE_BINARY_LIBRARIES "If set to true, binaries libraries are download
 # Find includes in corresponding build include_directories
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
+if(ZEN_PYTHON)
+    # this is only available in cmake 3.12 or newer
+    # look and build only for python3
+    find_package (Python3 REQUIRED COMPONENTS Development Interpreter)
+    # let the pybind11 cmake scripts know which Python version
+    # we intdent to use
+    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE} CACHE STRING "")
+endif()
+
 add_subdirectory(external)
 
 # contains additional C/C++ precompiler defines
@@ -120,30 +129,33 @@ set(zen_sources
     src/SensorProperties.cpp
     src/SensorProperties.h
 
-    src/LpMatrix.c
+    src/LpMatrix.cpp
     src/LpMatrix.h
 )
+
+# source files which only get compiled into the
+# library and not into the unit tests
+set(zen_library_only_sources)
+
+if(ZEN_PYTHON)
+    list (APPEND zen_library_only_sources
+        src/bindings/OpenZenPython.cpp
+    )
+    list (APPEND zen_optional_libs Python3::Python pybind11)
+    # select C++17 if we do a Python build because the C++17 interface of OpenZen.h
+    # is more convenient than the C++11 version
+    list (APPEND zen_optional_compile_definitions_private
+        OPENZEN_CXX17
+    )
+endif()
 
 if(ZEN_CSHARP)
     list (APPEND zen_sources
         ## run
-        # swig.exe -csharp -small -c++ -debug-typedef -o OpenZenCSharp/OpenZen_wrap_csharp.cxx -outdir OpenZenCSharp OpenZen.i
+        # swig -csharp -small -c++ -debug-typedef -DSWIGWORDSIZE64 -o OpenZenCSharp/OpenZen_wrap_csharp.cxx -outdir OpenZenCSharp OpenZen.i
         # in the bindings folder to generate
         bindings/OpenZenCSharp/OpenZen_wrap_csharp.cxx
     )
-endif()
-
-if(ZEN_PYTHON)
-    # this is only available in cmake 3.12 or newer
-    # look and build only for python3
-    find_package (Python3 REQUIRED COMPONENTS Development)
-    list (APPEND zen_sources
-        ## run
-        # swig.exe -python -small -c++ -debug-typedef -o OpenZenPython/OpenZen_wrap_python.cxx -outdir OpenZenPython OpenZen.i
-        # in the bindings folder to generate
-        bindings/OpenZenPython/OpenZen_wrap_python.cxx
-    )
-    list (APPEND zen_optional_libs Python3::Python)
 endif()
 
 set(zen_optional_test_sources)
@@ -478,9 +490,9 @@ set(zen_all_sources
 )
 
 if(ZEN_USE_STATIC_LIBS)
-    add_library(OpenZen STATIC ${zen_all_sources})
+    add_library(OpenZen STATIC ${zen_all_sources} ${zen_library_only_sources})
 else()
-    add_library(OpenZen SHARED ${zen_all_sources})
+    add_library(OpenZen SHARED ${zen_all_sources} ${zen_library_only_sources})
 
     # hide all non-exported symbols in the build
     set_target_properties(OpenZen PROPERTIES CXX_VISIBILITY_PRESET hidden)
@@ -506,12 +518,7 @@ target_compile_features(OpenZen
 
 set_property(TARGET OpenZen PROPERTY CXX_EXTENSIONS FALSE)
 
-if (MSVC)
-    target_compile_options(OpenZen
-        PRIVATE
-            /W4
-    )
-else()
+if (NOT MSVC)
     target_compile_options(OpenZen
         PRIVATE
             -Wall -Wextra -pedantic
@@ -572,31 +579,20 @@ target_link_libraries(OpenZen
         ${zen_libs}
 )
 
-# copy library to a name with underscore to conform with python naming conventions
-# http://www.swig.org/Doc1.3/Python.html#Python_nn7
-#message(FATAL_ERROR "Will copy from $<TARGET_FILE:OpenZen> to ${CMAKE_CURRENT_BINARY_DIR}/lib/_OpenZen.pyd")
-#message(FATAL_ERROR "Will ${ZEN_PYTHON} and ${WIN32}")
-
 if (ZEN_PYTHON)
     if(WIN32)
-        # rename file to be used as python module in Windows
-        #message(FATAL_ERROR "Will copy from ${<TARGET_FILE:OpenZen>} to ${CMAKE_CURRENT_BINARY_DIR}/lib/_OpenZen.pyd")
+        # copy file to be used as python module in Windows
         add_custom_command(TARGET OpenZen POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenZen> ${CMAKE_CURRENT_BINARY_DIR}/_OpenZen.pyd
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenZen> ${CMAKE_CURRENT_BINARY_DIR}/openzen.pyd
         )
     endif()
 
     if(UNIX)
-        # rename file to be used as python module in Linux/Max
+        # copy file to be used as python module in Linux/Mac
         add_custom_command(TARGET OpenZen POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenZen> ${CMAKE_CURRENT_BINARY_DIR}/_OpenZen.so
+            COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:OpenZen> ${CMAKE_CURRENT_BINARY_DIR}/openzen.so
         )
     endif()
-
-    # copy python interface file
-    add_custom_command(TARGET OpenZen POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/bindings/OpenZenPython/OpenZen.py ${CMAKE_CURRENT_BINARY_DIR}/OpenZen.py
-    )
 endif()
 
 if (ZEN_TESTS)
@@ -660,6 +656,20 @@ install(TARGETS OpenZen EXPORT OpenZenTarget
     RUNTIME DESTINATION bin
     PUBLIC_HEADER DESTINATION include
 )
+
+# even private static targts need to be exported to justify the
+# dependencies for static builds.
+# see https://gitlab.kitware.com/cmake/cmake/-/issues/17357
+if (ZEN_USE_STATIC_LIBS)
+    install(TARGETS spdlog EXPORT OpenZenTarget)
+
+    if (ZEN_PYTHON)
+        install(TARGETS pybind11 EXPORT OpenZenTarget)
+    endif()
+    if (ZEN_NETWORK)
+        install(TARGETS cppzmq EXPORT OpenZenTarget)
+    endif()
+endif()
 
 if(WIN32 AND ZEN_USE_BINARY_LIBRARIES)
     get_target_property(FTDI_DLL ftdi IMPORTED_LOCATION)

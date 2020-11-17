@@ -55,10 +55,10 @@ zmq::stream_connecter_base_t::stream_connecter_base_t (
     _s (retired_fd),
     _handle (static_cast<handle_t> (NULL)),
     _socket (session_->get_socket ()),
-    _session (session_),
     _delayed_start (delayed_start_),
     _reconnect_timer_started (false),
-    _current_reconnect_ivl (options.reconnect_ivl)
+    _current_reconnect_ivl (options.reconnect_ivl),
+    _session (session_)
 {
     zmq_assert (_addr);
     _addr->to_string (_endpoint);
@@ -101,7 +101,7 @@ void zmq::stream_connecter_base_t::process_term (int linger_)
 
 void zmq::stream_connecter_base_t::add_reconnect_timer ()
 {
-    if (options.reconnect_ivl != -1) {
+    if (options.reconnect_ivl > 0) {
         const int interval = get_new_reconnect_ivl ();
         add_timer (interval, reconnect_timer_id);
         _socket->event_connect_retried (
@@ -169,7 +169,7 @@ void zmq::stream_connecter_base_t::in_event ()
 }
 
 void zmq::stream_connecter_base_t::create_engine (
-  fd_t fd, const std::string &local_address_)
+  fd_t fd_, const std::string &local_address_)
 {
     const endpoint_uri_pair_t endpoint_pair (local_address_, _endpoint,
                                              endpoint_type_connect);
@@ -177,9 +177,9 @@ void zmq::stream_connecter_base_t::create_engine (
     //  Create the engine object for this connection.
     i_engine *engine;
     if (options.raw_socket)
-        engine = new (std::nothrow) raw_engine_t (fd, options, endpoint_pair);
+        engine = new (std::nothrow) raw_engine_t (fd_, options, endpoint_pair);
     else
-        engine = new (std::nothrow) zmtp_engine_t (fd, options, endpoint_pair);
+        engine = new (std::nothrow) zmtp_engine_t (fd_, options, endpoint_pair);
     alloc_assert (engine);
 
     //  Attach the engine to the corresponding session object.
@@ -188,7 +188,7 @@ void zmq::stream_connecter_base_t::create_engine (
     //  Shut the connecter down.
     terminate ();
 
-    _socket->event_connected (endpoint_pair, fd);
+    _socket->event_connected (endpoint_pair, fd_);
 }
 
 void zmq::stream_connecter_base_t::timer_event (int id_)
