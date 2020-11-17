@@ -46,13 +46,13 @@ namespace zen {
             if (msg.type == StreamingMessageType_ZenEventImu) {
                 evt.component.handle = msg.payload.imuData.component;
                 evt.sensor.handle = msg.payload.imuData.sensor;
-                evt.eventType = ZenImuEvent_Sample;
+                evt.eventType = ZenEventType_ImuData;
                 evt.data.imuData = msg.payload.imuData.data;
             }
             else if (msg.type == StreamingMessageType_ZenEventGnss) {
                 evt.component.handle = msg.payload.gnssData.component;
                 evt.sensor.handle = msg.payload.gnssData.sensor;
-                evt.eventType = ZenGnssEvent_Sample;
+                evt.eventType = ZenEventType_GnssData;
                 evt.data.gnssData = msg.payload.gnssData.data;
             }
             else {

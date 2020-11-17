@@ -24,7 +24,7 @@ if(${CMAKE_VERSION} VERSION_LESS "3.10.0")
   set(BUILD_OPENZEN OFF)
 endif()
 
-if (NOT BUILD_OPENZEN AND OPENZEN_ROS_BINARY_DOWNLOAD)
+if (NOT BUILD_OPENZEN AND NOT OPENZEN_ROS_BINARY_DOWNLOAD)
   message(FATAL_ERROR "Dependencies to build OpenZen not met and binary download disabled.")
 endif()
 
@@ -41,11 +41,11 @@ else()
   set(OPENZEN_BASE_FOLDER "${CMAKE_CURRENT_BINARY_DIR}/openzen_release")
 
   if (CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    set(OPENZEN_DOWNLOAD_URL "https://bitbucket.org/lpresearch/openzen/downloads/OpenZen-Ubuntu1604-x64-1.1.0.tar.gz")
-    set(OPENZEN_DOWNLOAD_HASH 10f22cdc865ca0f485086e6463b46c61c4fa6ef9f6c5f5c07a4c184015ba1d12)
+    set(OPENZEN_DOWNLOAD_URL "https://bitbucket.org/lpresearch/openzen/downloads/OpenZen-Ubuntu1604-x64-1.2.0.tar.gz")
+    set(OPENZEN_DOWNLOAD_HASH 8a9f0ffa03fc1bd49fb41248a9c08c63e0f427086c579a2725105b0e0e0b768b)
   elseif((CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "arm64") OR (CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "aarch64"))
-    set(OPENZEN_DOWNLOAD_URL "https://bitbucket.org/lpresearch/openzen/downloads/OpenZen-Ubuntu1604-arm64-1.1.2.tar.gz")
-    set(OPENZEN_DOWNLOAD_HASH 7ae71bcbcaf87bb5f8d3d29b44250771d9be45cd46426472cecfaa5de9ab93ba)
+    set(OPENZEN_DOWNLOAD_URL "https://bitbucket.org/lpresearch/openzen/downloads/OpenZen-Ubuntu1604-arm64-1.2.0.tar.gz")
+    set(OPENZEN_DOWNLOAD_HASH 385f6751035dfba475efda8e90680921330b0c556ad6b8204ed626fd9ead4359)
   else()
     message(FATAL_ERROR "No binary OpenZen release available for platform ${CMAKE_HOST_SYSTEM_PROCESSOR}")
   endif()
@@ -84,3 +84,15 @@ target_link_libraries(openzen_sensor_node
 )
 
 add_dependencies(openzen_sensor_node ${catkin_EXPORTED_TARGETS})
+
+## install node binary
+install(TARGETS openzen_sensor_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+if (CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
+  add_rostest(launch/openzen_test.launch)
+endif()

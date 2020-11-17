@@ -70,7 +70,7 @@ struct curve_client_tools_t
         put_uint64 (hello_nonce + 16, cn_nonce_);
 
         //  Create Box [64 * %x0](C'->S)
-        int rc =
+        const int rc =
           crypto_box (hello_box, &hello_plaintext[0], hello_plaintext.size (),
                       hello_nonce, server_key_, cn_secret_);
         if (rc == -1)
@@ -161,6 +161,7 @@ struct curve_client_tools_t
         memcpy (&vouch_plaintext[crypto_box_ZEROBYTES], cn_public_, 32);
         memcpy (&vouch_plaintext[crypto_box_ZEROBYTES + 32], server_key_, 32);
 
+        memset (vouch_nonce, 0, crypto_box_NONCEBYTES);
         memcpy (vouch_nonce, "VOUCH---", 8);
         randombytes (vouch_nonce + 8, 16);
 
@@ -246,6 +247,8 @@ struct curve_client_tools_t
         memcpy (server_key, curve_server_key_, crypto_box_PUBLICKEYBYTES);
 
         //  Generate short-term key pair
+        memset (cn_secret, 0, crypto_box_SECRETKEYBYTES);
+        memset (cn_public, 0, crypto_box_PUBLICKEYBYTES);
         rc = crypto_box_keypair (cn_public, cn_secret);
         zmq_assert (rc == 0);
     }
@@ -268,7 +271,7 @@ struct curve_client_tools_t
                           size_t size_,
                           const uint64_t cn_nonce_,
                           const uint8_t *metadata_plaintext_,
-                          const size_t metadata_length_)
+                          const size_t metadata_length_) const
     {
         return produce_initiate (data_, size_, cn_nonce_, server_key,
                                  public_key, secret_key, cn_public, cn_secret,
