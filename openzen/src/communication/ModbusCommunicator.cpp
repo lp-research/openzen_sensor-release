@@ -38,10 +38,10 @@ namespace zen
             return ZenError_IsNull;
 
         // [TODO] Split up into smaller messages
-        if (data.size() > std::numeric_limits<uint8_t>::max())
-            return ZenError_Io_MsgTooBig;
+        if (data.size() > std::numeric_limits<uint16_t>::max())
+           return ZenError_Io_MsgTooBig;
 
-        const auto frame = m_factory->makeFrame(address, function, data.data(), static_cast<uint8_t>(data.size()));
+        const auto frame = m_factory->makeFrame(address, function, data.data(), static_cast<uint16_t>(data.size()));
         return m_ioInterface->send(frame);
     }
 
@@ -74,7 +74,7 @@ namespace zen
                 SPDLOG_DEBUG("Received and parsed message with address {} function {} and data size {}",
                     std::to_string(frame.address), std::to_string(frame.function), frame.data.size());
 
-                if (m_subscriber->processReceivedData(frame.address, frame.function, frame.data))
+                if (auto error = m_subscriber->processReceivedData(frame.address, frame.function, frame.data); error && error != ZenError_BufferTooSmall)
                 {
                     spdlog::error("Failed to process message with address {} function {} data {}",
                         std::to_string(frame.address), std::to_string(frame.function), util::spanToString(frame.data));

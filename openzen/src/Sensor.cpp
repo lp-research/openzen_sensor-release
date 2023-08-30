@@ -58,7 +58,7 @@ namespace zen
             else if (version == 1)
                 return std::make_unique<modbus::LpFrameFactory>();
 
-            return std::make_unique<modbus::RTUFrameFactory>();
+            return std::make_unique<modbus::LpFrameFactory>();
         }
 
         std::unique_ptr<modbus::IFrameParser> getParser(uint32_t version) noexcept
@@ -68,7 +68,7 @@ namespace zen
             if (version == 1)
                 return std::make_unique<modbus::LpFrameParser>();
 
-            return std::make_unique<modbus::RTUFrameParser>();
+            return std::make_unique<modbus::LpFrameParser>();
         }
 
         std::unique_ptr<ModbusCommunicator> moveCommunicator(std::unique_ptr<ModbusCommunicator> communicator, IModbusFrameSubscriber& newSubscriber, uint32_t version)
@@ -85,9 +85,11 @@ namespace zen
     static auto imuRegistry = make_registry<ImuComponentFactory>(g_zenSensorType_Imu);
     static auto gnssRegistry = make_registry<GnssComponentFactory>(g_zenSensorType_Gnss);
 
-    nonstd::expected<std::shared_ptr<Sensor>, ZenSensorInitError> make_sensor(SensorConfig config, std::unique_ptr<ModbusCommunicator> communicator, uintptr_t token) noexcept
+    nonstd::expected<std::shared_ptr<Sensor>, ZenSensorInitError> make_sensor(SensorConfig config, std::unique_ptr<ModbusCommunicator> communicator, uintptr_t token, std::string deviceName) noexcept
     {
         auto sensor = std::make_shared<Sensor>(std::move(config), std::move(communicator), token);
+        sensor->m_deviceName = deviceName;
+
         if (auto error = sensor->init())
             return nonstd::make_unexpected(error);
 
@@ -351,6 +353,7 @@ namespace zen
                     return m_communicator->publishResult(function, ZenError_None, *reinterpret_cast<const uint32_t*>(data.data()));
 
                 default:
+                    spdlog::error("Unsupported function received as sensor base function: {0}", int(function));
                     return ZenError_Io_UnsupportedFunction;
                 }
             }
@@ -420,6 +423,12 @@ namespace zen
                     if (data.size() != sizeof(uint32_t))
                         return ZenError_Io_MsgCorrupt;
                     return m_communicator->publishResult(static_cast<ZenProperty_t>(EDevicePropertyInternal::ConfigGetDegGradOutput),
+                        ZenError_None, *reinterpret_cast<const uint32_t*>(data.data()));
+
+                case EDevicePropertyInternal::ConfigGetLpBusDataPrecision:
+                    if (data.size() != sizeof(uint32_t))
+                        return ZenError_Io_MsgCorrupt;
+                    return m_communicator->publishResult(static_cast<ZenProperty_t>(EDevicePropertyInternal::ConfigGetLpBusDataPrecision),
                         ZenError_None, *reinterpret_cast<const uint32_t*>(data.data()));
 
                 case EDevicePropertyInternal::ConfigGpsOutputDataBitset:
