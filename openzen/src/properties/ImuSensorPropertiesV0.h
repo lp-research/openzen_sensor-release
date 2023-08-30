@@ -57,6 +57,9 @@ namespace zen
 
             switch (property)
             {
+            case ZenImuProperty_Id:
+                return get_set(EDevicePropertyV0::GetImuId, EDevicePropertyV0::SetImuId);
+
             case ZenImuProperty_SamplingRate:
                 return set_or(EDevicePropertyV0::SetSamplingRate);
 
@@ -92,6 +95,9 @@ namespace zen
 
             case ZenImuProperty_GyrBias:
                 return get_set(EDevicePropertyV0::GetGyrBias, EDevicePropertyV0::SetGyrBias);
+
+            case ZenImuProperty_GyrStaticBias:
+                return get_set(EDevicePropertyV0::GetGyrStaticBias, EDevicePropertyV0::SetGyrStaticBias);
 
             case ZenImuProperty_GyrRange:
                 return get_set(EDevicePropertyV0::GetGyrRange, EDevicePropertyV0::SetGyrRange);

@@ -6,51 +6,10 @@ To build Google Test and your tests that use it, you need to tell your build
 system where to find its headers and source files. The exact way to do it
 depends on which build system you use, and is usually straightforward.
 
-#### Build
+### Build with CMake
 
-Suppose you put Google Test in directory `${GTEST_DIR}`. To build it, create a
-library build target (or a project as called by Visual Studio and Xcode) to
-compile
-
-    ${GTEST_DIR}/src/gtest-all.cc
-
-with `${GTEST_DIR}/include` in the system header search path and `${GTEST_DIR}`
-in the normal header search path. Assuming a Linux-like system and gcc,
-something like the following will do:
-
-    g++ -std=c++11 -isystem ${GTEST_DIR}/include -I${GTEST_DIR} \
-        -pthread -c ${GTEST_DIR}/src/gtest-all.cc
-    ar -rv libgtest.a gtest-all.o
-
-(We need `-pthread` as Google Test uses threads.)
-
-Next, you should compile your test source file with `${GTEST_DIR}/include` in
-the system header search path, and link it with gtest and any other necessary
-libraries:
-
-    g++ -std=c++11 -isystem ${GTEST_DIR}/include -pthread path/to/your_test.cc libgtest.a \
-        -o your_test
-
-As an example, the make/ directory contains a Makefile that you can use to build
-Google Test on systems where GNU make is available (e.g. Linux, Mac OS X, and
-Cygwin). It doesn't try to build Google Test's own tests. Instead, it just
-builds the Google Test library and a sample test. You can use it as a starting
-point for your own build script.
-
-If the default settings are correct for your environment, the following commands
-should succeed:
-
-    cd ${GTEST_DIR}/make
-    make
-    ./sample1_unittest
-
-If you see errors, try to tweak the contents of `make/Makefile` to make them go
-away. There are instructions in `make/Makefile` on how to do it.
-
-### Using CMake
-
-Google Test comes with a CMake build script (
-[CMakeLists.txt](https://github.com/google/googletest/blob/master/CMakeLists.txt))
+Google Test comes with a CMake build script
+([CMakeLists.txt](https://github.com/google/googletest/blob/master/CMakeLists.txt))
 that can be used on a wide range of platforms ("C" stands for cross-platform.).
 If you don't have CMake installed already, you can download it for free from
 <http://www.cmake.org/>.
@@ -215,9 +174,9 @@ We list the most frequently used macros below. For a complete list, see file
 ### Multi-threaded Tests
 
 Google Test is thread-safe where the pthread library is available. After
-`#include "gtest/gtest.h"`, you can check the `GTEST_IS_THREADSAFE` macro to see
-whether this is the case (yes if the macro is `#defined` to 1, no if it's
-undefined.).
+`#include "gtest/gtest.h"`, you can check the
+`GTEST_IS_THREADSAFE` macro to see whether this is the case (yes if the macro is
+`#defined` to 1, no if it's undefined.).
 
 If Google Test doesn't correctly detect whether pthread is available in your
 environment, you can force it with
@@ -230,9 +189,9 @@ or
 
 When Google Test uses pthread, you may need to add flags to your compiler and/or
 linker to select the pthread library, or you'll get link errors. If you use the
-CMake script or the deprecated Autotools script, this is taken care of for you.
-If you use your own build script, you'll need to read your compiler and linker's
-manual to figure out what flags to add.
+CMake script, this is taken care of for you. If you use your own build script,
+you'll need to read your compiler and linker's manual to figure out what flags
+to add.
 
 ### As a Shared Library (DLL)
 

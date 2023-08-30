@@ -39,7 +39,7 @@ namespace zen
 
         {
             const auto result = m_properties->getArray(ZenImuProperty_AccAlignment, ZenPropertyType_Float,
-                gsl::make_span(reinterpret_cast<std::byte*>(local_cache.borrow()->accAlignMatrix.data), 9));
+                gsl::make_span(reinterpret_cast<std::byte*>(local_cache.borrow()->accAlignMatrix.data), 9*sizeof(float)));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
         }
@@ -50,7 +50,7 @@ namespace zen
         });
         {
             const auto result = m_properties->getArray(ZenImuProperty_GyrAlignment, ZenPropertyType_Float,
-                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->gyrAlignMatrix.data), 9));
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->gyrAlignMatrix.data), 9*sizeof(float)));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
         }
@@ -60,7 +60,7 @@ namespace zen
         });
         {
             const auto result = m_properties->getArray(ZenImuProperty_MagSoftIronMatrix, ZenPropertyType_Float,
-                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->softIronMatrix.data), 9));
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->softIronMatrix.data), 9*sizeof(float)));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
         }
@@ -71,7 +71,7 @@ namespace zen
         });
         {
             const auto result = m_properties->getArray(ZenImuProperty_AccBias, ZenPropertyType_Float,
-                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->accBias.data), 3));
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->accBias.data), 3*sizeof(float)));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
 
@@ -83,7 +83,7 @@ namespace zen
         }
         {
             const auto result = m_properties->getArray(ZenImuProperty_GyrBias, ZenPropertyType_Float,
-                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->gyrBias.data), 3));
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->gyrBias.data), 3*sizeof(float)));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
 
@@ -95,7 +95,7 @@ namespace zen
         }
         {
             const auto result = m_properties->getArray(ZenImuProperty_MagHardIronOffset, ZenPropertyType_Float,
-                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->hardIronOffset.data), 3));
+                gsl::make_span(reinterpret_cast<std::byte*>(&local_cache.borrow()->hardIronOffset.data), 3*sizeof(float)));
             if (result.first)
                 return ZenSensorInitError_RetrieveFailed;
 
@@ -121,6 +121,7 @@ namespace zen
         const auto property = static_cast<EDevicePropertyV0>(function);
         switch (property)
         {
+        case EDevicePropertyV0::GetImuId:
         case EDevicePropertyV0::GetLinearCompensationRate:
         case EDevicePropertyV0::GetFilterMode:
         case EDevicePropertyV0::GetFilterPreset:
@@ -142,6 +143,7 @@ namespace zen
 
         case EDevicePropertyV0::GetAccBias:
         case EDevicePropertyV0::GetGyrBias:
+        case EDevicePropertyV0::GetGyrStaticBias:
         case EDevicePropertyV0::GetMagBias:
         case EDevicePropertyV0::GetMagReference:
         case EDevicePropertyV0::GetMagHardIronOffset:
@@ -161,9 +163,10 @@ namespace zen
         case EDevicePropertyV0::GetCanMapping:
             if (data.size() != sizeof(uint32_t) * 16)
                 return ZenError_Io_MsgCorrupt;
-            return m_communicator.publishArray(function, ZenError_None, gsl::make_span(reinterpret_cast<const float*>(data.data()), 16));
+            return m_communicator.publishArray(function, ZenError_None, gsl::make_span(reinterpret_cast<const int32_t*>(data.data()), 16));
 
         default:
+            spdlog::error("Unsuporretd function {0} received in legacy IMU component", int(function));
             return ZenError_Io_UnsupportedFunction;
         }
     }
@@ -196,13 +199,13 @@ namespace zen
 
         sensor_parsing_util::parseAndStoreScalar(data, &imuData.frameCount);
 
-        float timestampMultiplier = 0.0f;
+        double timestampMultiplier = 0.0;
         if (const auto samplingRate = m_properties->getInt32(ZenImuProperty_SamplingRate)){
             // When the VR firmware runs with 800 Hz, it also runs with an internal
             // frequency of 800 Hz which means we need to multiply wtih 0.00125 to comput the
             // correct timestamp.
             // therefore, this value is set depending on the IMU variant.
-            timestampMultiplier = samplingRate.value() > 400 ? 0.00125f : 0.0025f;
+            timestampMultiplier = samplingRate.value() > 400 ? 0.00125 : 0.0025;
         } else {
             spdlog::error("Cannot query sampling rate to comput timestamp");
             return nonstd::make_unexpected(samplingRate.error());;
@@ -223,15 +226,15 @@ namespace zen
                     }
 
                     for (unsigned idx = 0; idx < 3; ++idx)
-                        imuData.gRaw[idx] = (180.f / float(M_PI)) * (*lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data));
+                        imuData.g1Raw[idx] = (180.f / float(M_PI)) * (*lowPrec ? parseFloat16(data, 1000.f) : parseFloat32(data));
 
                     auto cache = m_cache.borrow();
 
                     LpVector3f g;
-                    convertArrayToLpVector3f(imuData.gRaw, &g);
+                    convertArrayToLpVector3f(imuData.g1Raw, &g);
                     matVectMult3(&cache->gyrAlignMatrix, &g, &g);
                     vectAdd3x1(&cache->gyrBias, &g, &g);
-                    convertLpVector3fToArray(&g, imuData.g);
+                    convertLpVector3fToArray(&g, imuData.g1);
                 }
             }
             else

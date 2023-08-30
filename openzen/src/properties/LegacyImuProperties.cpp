@@ -214,16 +214,31 @@ namespace zen
         if (propertyType != type(property))
             return std::make_pair(ZenError_WrongDataType, buffer.size());
 
-        if (property == ZenImuProperty_SupportedSamplingRates)
-            return imu::v0::supportedSamplingRates(gsl::make_span(reinterpret_cast<int32_t*>(buffer.data()), buffer.size()));
-        else if (property == ZenImuProperty_SupportedFilterModes)
+        // Internal interface is typesafe, but external interface uses bytes, so we
+        // have to account for that.  This does the necessary translations for int32_t
+        // properties.
+        auto getArrayInt32 = [](auto func, auto& buffer) -> std::pair<ZenError, size_t> {
+            auto bufferAsInt32 = gsl::make_span(
+                reinterpret_cast<int32_t*>(buffer.data()), buffer.size() / sizeof(int32_t));
+            auto [err, item_count] = func(bufferAsInt32);
+            return { err, item_count * sizeof(int32_t) };
+        };
+
+        if (property == ZenImuProperty_SupportedSamplingRates) {
+            return getArrayInt32(imu::v0::supportedSamplingRates, buffer);
+        }
+        else if (property == ZenImuProperty_SupportedFilterModes) {
             return imu::v0::supportedFilterModes(buffer);
-        else if (property == ZenImuProperty_AccSupportedRanges)
-            return imu::v0::supportedAccRanges(gsl::make_span(reinterpret_cast<int32_t*>(buffer.data()), buffer.size()));
-        else if (property == ZenImuProperty_GyrSupportedRanges)
-            return imu::v0::supportedGyrRanges(gsl::make_span(reinterpret_cast<int32_t*>(buffer.data()), buffer.size()));
-        else if (property == ZenImuProperty_MagSupportedRanges)
-            return imu::v0::supportedMagRanges(gsl::make_span(reinterpret_cast<int32_t*>(buffer.data()), buffer.size()));
+        }
+        else if (property == ZenImuProperty_AccSupportedRanges) {
+            return getArrayInt32(imu::v0::supportedAccRanges, buffer);
+        }
+        else if (property == ZenImuProperty_GyrSupportedRanges) {
+            return getArrayInt32(imu::v0::supportedGyrRanges, buffer);
+        }
+        else if (property == ZenImuProperty_MagSupportedRanges) {
+            return getArrayInt32(imu::v0::supportedMagRanges, buffer);
+        }
 
         auto streaming = getBool(ZenImuProperty_StreamData);
         if (!streaming)
@@ -239,12 +254,15 @@ namespace zen
             });
 
         const auto function = static_cast<DeviceProperty_t>(imu::v0::map(property, true));
-        if (propertyType == ZenPropertyType_Float)
-            return m_communicator.sendAndWaitForArray(0, function, function, {}, gsl::make_span(reinterpret_cast<float*>(buffer.data()), buffer.size()));
-        else if (propertyType == ZenPropertyType_Int32)
-            return m_communicator.sendAndWaitForArray(0, function, function, {}, gsl::make_span(reinterpret_cast<int32_t*>(buffer.data()), buffer.size()));
+        switch (propertyType) {
+            case ZenPropertyType_Float:
+            case ZenPropertyType_Int32:
+                return m_communicator.sendAndWaitForArray(0, function, function, {}, buffer);
+                
+            default:
+                return std::make_pair(ZenError_WrongDataType, buffer.size());
+        }
 
-        return std::make_pair(ZenError_WrongDataType, buffer.size());
     }
 
     nonstd::expected<bool, ZenError> LegacyImuProperties::getBool(ZenProperty_t property) noexcept
@@ -870,6 +888,7 @@ namespace zen
         case ZenImuProperty_AccSupportedRanges:
         case ZenImuProperty_GyrAlignment:
         case ZenImuProperty_GyrBias:
+        case ZenImuProperty_GyrStaticBias:
         case ZenImuProperty_GyrSupportedRanges:
         case ZenImuProperty_MagAlignment:
         case ZenImuProperty_MagBias:
@@ -948,6 +967,7 @@ namespace zen
         case ZenImuProperty_AccBias:
         case ZenImuProperty_GyrAlignment:
         case ZenImuProperty_GyrBias:
+        case ZenImuProperty_GyrStaticBias:
         case ZenImuProperty_MagAlignment:
         case ZenImuProperty_MagBias:
         case ZenImuProperty_MagReference:
@@ -956,6 +976,7 @@ namespace zen
         case ZenImuProperty_CanHeartbeat:
             return ZenPropertyType_Float;
 
+        case ZenImuProperty_Id:
         case ZenImuProperty_SamplingRate:
         case ZenImuProperty_SupportedSamplingRates:
         case ZenImuProperty_FilterMode:
@@ -966,7 +987,6 @@ namespace zen
         case ZenImuProperty_GyrSupportedRanges:
         case ZenImuProperty_MagRange:
         case ZenImuProperty_MagSupportedRanges:
-
         case ZenImuProperty_CanChannelMode:
         case ZenImuProperty_CanPointMode:
         case ZenImuProperty_CanStartId:

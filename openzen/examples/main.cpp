@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: MIT
 //
 //===========================================================================//
-
+#define OPENZEN_CXX14
 #include "OpenZen.h"
 
 #include <array>
@@ -43,77 +43,67 @@ namespace
 
 void pollLoop(std::reference_wrapper<ZenClient> client)
 {
+    unsigned int i = 0;
     while (!g_terminate)
     {
-        unsigned int i = 0;
-        while (true)
+        const auto pair = client.get().waitForNextEvent();
+        const bool success = pair.first;
+        auto& event = pair.second;
+        if (!success)
+            break;
+
+        if (!event.component.handle)
         {
-            const auto pair = client.get().waitForNextEvent();
-            const bool success = pair.first;
-            auto& event = pair.second;
-            if (!success)
-                break;
-
-            if (!event.component.handle)
+            if (event.eventType == ZenEventType_SensorFound)
             {
-                switch (event.eventType)
-                {
-                case ZenEventType_SensorFound:
-                    addDiscoveredSensor(event.data.sensorFound);
-                    break;
-
-                case ZenEventType_SensorListingProgress:
-                    if (event.data.sensorListingProgress.progress == 1.0f)
-                        g_discoverCv.notify_one();
-                    break;
+                addDiscoveredSensor(event.data.sensorFound);
+            }
+            else if (event.eventType == ZenEventType_SensorListingProgress)
+            {
+                if (event.data.sensorListingProgress.progress == 1.0f)
+                    g_discoverCv.notify_one();
+            }
+        }
+        else if (( g_imuHandle > 0) && (event.component.handle == g_imuHandle))
+        {
+            if (event.eventType == ZenEventType_ImuData)
+            {
+                if (i++ % 100 == 0) {
+                    std::cout << "Event type: " << event.eventType << std::endl;
+                    std::cout << "> Event component: " << uint32_t(event.component.handle) << std::endl;
+                    std::cout << "> Acceleration: \t x = " << event.data.imuData.a[0]
+                        << "\t y = " << event.data.imuData.a[1]
+                        << "\t z = " << event.data.imuData.a[2] << std::endl;
+                    std::cout << "> Gyro: \t\t x = " << event.data.imuData.g1[0]
+                        << "\t y = " << event.data.imuData.g1[1]
+                        << "\t z = " << event.data.imuData.g1[2] << std::endl;
                 }
             }
-            else if (( g_imuHandle > 0) && (event.component.handle == g_imuHandle))
+        }
+        else if (( g_gnssHandle > 0) && (event.component.handle == g_gnssHandle))
+        {
+            if (event.eventType == ZenEventType_GnssData)
             {
-                switch (event.eventType)
-                {
-                case ZenEventType_ImuData:
-                    if (i++ % 100 == 0) {
-                        std::cout << "Event type: " << event.eventType << std::endl;
-                        std::cout << "> Event component: " << uint32_t(event.component.handle) << std::endl;
-                        std::cout << "> Acceleration: \t x = " << event.data.imuData.a[0]
-                            << "\t y = " << event.data.imuData.a[1]
-                            << "\t z = " << event.data.imuData.a[2] << std::endl;
-                        std::cout << "> Gyro: \t\t x = " << event.data.imuData.g[0]
-                            << "\t y = " << event.data.imuData.g[1]
-                            << "\t z = " << event.data.imuData.g[2] << std::endl;
-                    }
-                    break;
+                std::cout << "Event type: " << event.eventType << std::endl;
+                std::cout << "> Event component: " << uint32_t(event.component.handle) << std::endl;
+                std::cout << "> GPS Fix: \t = " << event.data.gnssData.fixType << std::endl;
+                std::cout << "> Longitude: \t = " << event.data.gnssData.longitude
+                    << "   Latitude: \t = " << event.data.gnssData.latitude << std::endl;
+                std::cout << " > GPS Time " << int(event.data.gnssData.year) << "/"
+                    << int(event.data.gnssData.month) << "/"
+                    << int(event.data.gnssData.day) << " "
+                    << int(event.data.gnssData.hour) << ":"
+                    << int(event.data.gnssData.minute) << ":"
+                    << int(event.data.gnssData.second) << " UTC" << std::endl;
+
+                if (event.data.gnssData.carrierPhaseSolution == ZenGnssFixCarrierPhaseSolution_None) {
+                    std::cout << " > RTK not used" << std::endl;
                 }
-            }
-            else if (( g_gnssHandle > 0) && (event.component.handle == g_gnssHandle))
-            {
-                switch (event.eventType)
-                {
-                case ZenEventType_GnssData:
-                        std::cout << "Event type: " << event.eventType << std::endl;
-                        std::cout << "> Event component: " << uint32_t(event.component.handle) << std::endl;
-                        std::cout << "> GPS Fix: \t = " << event.data.gnssData.fixType << std::endl;
-                        std::cout << "> Longitude: \t = " << event.data.gnssData.longitude
-                            << "   Latitude: \t = " << event.data.gnssData.latitude << std::endl;
-                        std::cout << " > GPS Time " << int(event.data.gnssData.year) << "/"
-                            << int(event.data.gnssData.month) << "/"
-                            << int(event.data.gnssData.day) << " "
-                            << int(event.data.gnssData.hour) << ":"
-                            << int(event.data.gnssData.minute) << ":"
-                            << int(event.data.gnssData.second) << " UTC" << std::endl;
-
-                        if (event.data.gnssData.carrierPhaseSolution == ZenGnssFixCarrierPhaseSolution_None) {
-                            std::cout << " > RTK not used" << std::endl;
-                        }
-                        else if (event.data.gnssData.carrierPhaseSolution == ZenGnssFixCarrierPhaseSolution_FloatAmbiguities) {
-                            std::cout << " > RTK used with float ambiguities" << std::endl;
-                        }
-                        else if (event.data.gnssData.carrierPhaseSolution == ZenGnssFixCarrierPhaseSolution_FixedAmbiguities) {
-                            std::cout << " > RTK used with fixed ambiguities" << std::endl;
-                        }
-
-                        break;
+                else if (event.data.gnssData.carrierPhaseSolution == ZenGnssFixCarrierPhaseSolution_FloatAmbiguities) {
+                    std::cout << " > RTK used with float ambiguities" << std::endl;
+                }
+                else if (event.data.gnssData.carrierPhaseSolution == ZenGnssFixCarrierPhaseSolution_FixedAmbiguities) {
+                    std::cout << " > RTK used with fixed ambiguities" << std::endl;
                 }
             }
         }
@@ -172,10 +162,20 @@ int main(int argc, char *argv[])
     do
     {
         std::cout << "Provide an index within the range 0-" << g_discoveredSensors.size() - 1 << ":" << std::endl;
+        std::cout << "Note that the default connection baud rate is 921600, which is not the case for LPMS-BE/ME sensors. More details in the comment of this program." << std::endl;
         std::cin >> idx;
     } while (idx >= g_discoveredSensors.size());
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
+    // the default baud rate is 921600, which is not the case for LPMS-BE and LPMS-ME sensors (115200).
+    // there are 2 ways of resolving this issue:
+    // 
+    // 1. uncomment the following line so to change the connection baud rate
+    // g_discoveredSensors[idx].baudRate = 115200;
+    //
+    // 2. connect to the sensor byName, with baud rate being the last parameter. In this way we don't need to call client.listSensorsAsync()
+    // auto sensorPair = client.obtainSensorByName("SiUsb", "lpmscu2000573", 921600);
+    // OR auto sensorPair = client.obtainSensorByName("WindowsDevice", "\\\\.\\COM7", 921600);
     auto sensorPair = client.obtainSensor(g_discoveredSensors[idx]);
     auto& obtainError = sensorPair.first;
     auto& sensor = sensorPair.second;
