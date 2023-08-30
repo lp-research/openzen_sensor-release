@@ -45,7 +45,7 @@ namespace zen::modbus
     public:
         virtual ~IFrameFactory() = default;
 
-        virtual std::vector<std::byte> makeFrame(uint8_t address, uint8_t function, const std::byte* data, uint8_t length) const = 0;
+        virtual std::vector<std::byte> makeFrame(uint8_t address, uint8_t function, const std::byte* data, uint16_t length) const = 0;
     };
 
     class IFrameParser
@@ -68,88 +68,12 @@ namespace zen::modbus
 
     enum class ModbusFormat
     {
-        ASCII,
         LP,
-        RTU
     };
 
     std::unique_ptr<IFrameFactory> make_factory(ModbusFormat format) noexcept;
     std::unique_ptr<IFrameParser> make_parser(ModbusFormat format) noexcept;
 
-    enum class ASCIIFrameParseState
-    {
-        Start,
-        Address1,
-        Address2,
-        Function1,
-        Function2,
-        Length1,
-        Length2,
-        Data1,
-        Data2,
-        Check1,
-        Check2,
-        End1,
-        End2,
-        Finished,
-
-        Max
-    };
-
-    class ASCIIFrameParser : public IFrameParser
-    {
-    public:
-        ASCIIFrameParser();
-
-        FrameParseError parse(gsl::span<const std::byte>& data) override;
-        void reset() override;
-
-        bool finished() const override { return m_state == ASCIIFrameParseState::Finished; }
-
-    private:
-        ASCIIFrameParseState m_state;
-        uint8_t m_length;
-        std::byte m_buffer;
-    };
-
-    class ASCIIFrameFactory : public IFrameFactory
-    {
-        std::vector<std::byte> makeFrame(uint8_t address, uint8_t function, const std::byte* data, uint8_t length) const override;
-    };
-
-    enum class RTUFrameParseState
-    {
-        Address,
-        Function,
-        Length,
-        Data,
-        Check1,
-        Check2,
-        Finished,
-
-        Max
-    };
-
-    class RTUFrameFactory : public IFrameFactory
-    {
-        std::vector<std::byte> makeFrame(uint8_t address, uint8_t function, const std::byte* data, uint8_t length) const override;
-    };
-
-    class RTUFrameParser : public IFrameParser
-    {
-    public:
-        RTUFrameParser();
-
-        FrameParseError parse(gsl::span<const std::byte>& data) override;
-        void reset() override;
-
-        bool finished() const override { return m_state == RTUFrameParseState::Finished; }
-
-    private:
-        RTUFrameParseState m_state;
-        uint8_t m_length;
-        std::byte m_buffer;
-    };
 
     enum class LpFrameParseState
     {
@@ -172,7 +96,7 @@ namespace zen::modbus
 
     class LpFrameFactory : public IFrameFactory
     {
-        std::vector<std::byte> makeFrame(uint8_t address, uint8_t function, const std::byte* data, uint8_t length) const override;
+        std::vector<std::byte> makeFrame(uint8_t address, uint8_t function, const std::byte* data, uint16_t length) const override;
     };
 
     class LpFrameParser : public IFrameParser
@@ -187,7 +111,7 @@ namespace zen::modbus
 
     private:
         LpFrameParseState m_state;
-        uint8_t m_length;
+        uint16_t m_length;
         std::byte m_buffer;
     };
 }

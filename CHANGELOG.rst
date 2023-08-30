@@ -2,8 +2,20 @@
 Changelog for package openzen_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.3.2 (2023-08-29)
+------------------
+* fix default gyro mapping for legacy sensor
+  tested with URS2
+* update ros package version to v1.3.1
+* update submodule openzen to v1.3.1 to support LPMS3 sensors
+* switch default gyros for different sensors
+* updated OpenZen to be able to parse 16-bit data format messages for IG1
+* updated to recent OpenZen to be able to directly connect to Linux device files
+* added link to melodic ROS directly
+* Contributors: LP-Research Inc. Team
+
 1.2.0 (2020-11-17)
------------
+------------------
 * fixed conditions check for build or download OpenZen options
 * fixed name of primary maintainer
 * added install target for openzen_node
@@ -12,10 +24,10 @@ Changelog for package openzen_driver
 * switched binary downloads to OpenZen 1.2.0
 * updated OpenZen to version 1.2.0
 * added output of GNSS measurement as ROS NavSatFix message
-* Contributors:
+* Contributors: LP-Research Inc. Team
 
 1.0.1 (2020-09-03)
------------
+------------------
 * changed OpenZen version to release 1.1.3
 * added option to select binary download and disabled binary downloads by default
 * updated to OpenZen 1.1.2 for ARM64

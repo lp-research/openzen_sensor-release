@@ -92,16 +92,38 @@ namespace zen
                 static_cast<ZenProperty_t>(EDevicePropertyInternal::ConfigGetDegGradOutput), {}))
             {
                 spdlog::debug("Ig1 sensor outputs degrees: {}", degreeOutputConfigured.value() == 0 );
-                properties->setDegGradOutput(degreeOutputConfigured.value() > 0);
+                properties->setRadOutput(degreeOutputConfigured.value() > 0);
             }
             else
             {
                 return nonstd::make_unexpected(ZenSensorInitError_RetrieveFailed);
             }
 
-            bool useSecondGyroAsPrimary = specialOptions & SpecialOptions_SecondGyroIsPrimary;
+            // check if we are in 16-bit low precision data mode
+            if (auto lowPrecisionConfigured =
+                communicator.sendAndWaitForResult<uint32_t>(0u, static_cast<DeviceProperty_t>(EDevicePropertyV1::GetLpBusDataPrecision),
+                static_cast<ZenProperty_t>(EDevicePropertyInternal::ConfigGetLpBusDataPrecision), {}))
+            {
+                spdlog::debug("Ig1 sensor outputs in low precision mode: {}", lowPrecisionConfigured.value() == 0 );
+                // if the value is 0, the sensor is in low-precision mode
+                properties->setLowPrecisionMode(lowPrecisionConfigured.value() == 0);
+            }
+            else
+            {
+                return nonstd::make_unexpected(ZenSensorInitError_RetrieveFailed);
+            }
 
-            return std::make_unique<ImuIg1Component>(std::move(properties), communicator, version, useSecondGyroAsPrimary);
+            bool hasFirstGyro = true, hasSecondGyro = true;
+            switch (specialOptions) {
+                case SpecialOptions_OnlyFirstGyro:
+                    hasSecondGyro = false;
+                    break;
+                case SpecialOptions_OnlySecondGyro:
+                    hasFirstGyro = false;
+                    break;
+            }
+
+            return std::make_unique<ImuIg1Component>(std::move(properties), communicator, version, hasFirstGyro, hasSecondGyro);
 
         }
 
