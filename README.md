@@ -1,3 +1,26 @@
+## openzen_sensor (noetic) - 1.3.2-1
+
+The packages in the `openzen_sensor` repository were released into the `noetic` distro by running `/usr/bin/bloom-release --rosdistro noetic openzen_sensor` on `Wed, 30 Aug 2023 06:05:03 -0000`
+
+The `openzen_sensor` package was released.
+
+Version of package(s) in repository `openzen_sensor`:
+
+- upstream repository: https://bitbucket.org/lpresearch/openzenros.git
+- release repository: https://github.com/lp-research/openzen_sensor-release.git
+- rosdistro version: `1.2.0-1`
+- old version: `1.2.0-1`
+- new version: `1.3.2-1`
+
+Versions of tools used:
+
+- bloom version: `0.11.2`
+- catkin_pkg version: `0.5.2`
+- rosdep version: `0.20.1`
+- rosdistro version: `0.8.3`
+- vcstools version: `0.1.42`
+
+
 ## openzen_sensor (noetic) - 1.2.0-1
 
 The packages in the `openzen_sensor` repository were released into the `noetic` distro by running `/usr/bin/bloom-release --rosdistro noetic openzen_sensor` on `Tue, 05 Jan 2021 05:54:31 -0000`
