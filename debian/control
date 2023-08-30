@@ -1,0 +1,12 @@
+Source: ros-noetic-openzen-sensor
+Section: misc
+Priority: optional
+Maintainer: H.E. YAP <yap@lp-research.com>
+Build-Depends: debhelper (>= 9.0.0), ros-noetic-catkin, ros-noetic-roscpp, ros-noetic-roslaunch <!nocheck>, ros-noetic-rostest <!nocheck>, ros-noetic-sensor-msgs, ros-noetic-std-msgs, ros-noetic-std-srvs
+Homepage: 
+Standards-Version: 3.9.2
+
+Package: ros-noetic-openzen-sensor
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ros-noetic-roscpp, ros-noetic-sensor-msgs, ros-noetic-std-msgs, ros-noetic-std-srvs, ros-noetic-tf, ros-noetic-topic-tools
+Description: ROS driver for LP-Research inertial measurement units and satellite navigation senors
