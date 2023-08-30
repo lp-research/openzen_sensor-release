@@ -15,7 +15,11 @@
 #include "communication/EventCommunicator.h"
 #include "components/ComponentFactoryManager.h"
 #include "io/IoManager.h"
-#include "io/can/CanManager.h"
+
+#ifdef ZEN_PCAN
+    #include "io/can/CanManager.h"
+#endif
+
 #include "utility/StringView.h"
 
 #include <spdlog/spdlog.h>
@@ -120,7 +124,8 @@ namespace zen
             const auto token = m_nextToken++;
             lock.unlock();
 
-            auto sensor = make_sensor(std::move(*agreement), std::move(communicator), token);
+            auto deviceName = negotiator.m_deviceName ? *negotiator.m_deviceName : "";
+            auto sensor = make_sensor(std::move(*agreement), std::move(communicator), token, deviceName);
             if (!sensor) {
                 spdlog::error("Sensor object cannot be created");
                 return nonstd::make_unexpected(sensor.error());
@@ -129,6 +134,8 @@ namespace zen
             lock.lock();
             m_sensors.insert(*sensor);
             lock.unlock();
+
+            spdlog::info("Sensor {} is connected", deviceName);
 
             return std::move(*sensor);
         }
@@ -153,6 +160,8 @@ namespace zen
             lock.lock();
             m_sensors.insert(*sensor);
             lock.unlock();
+
+            spdlog::info("High level sensor is connected");
 
             return std::move(*sensor);
         }
@@ -229,10 +238,12 @@ namespace zen
 
     void SensorManager::sensorLoop()
     {
+#ifdef ZEN_PCAN
         while (!m_terminate)
         {
             CanManager::get().poll();
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
+#endif
     }
 }

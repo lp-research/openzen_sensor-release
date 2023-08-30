@@ -45,6 +45,7 @@ ZenEvents about sensor discovery results and incoming measurement data.
 #include <chrono>
 #include <cstddef>
 #include <cstring>
+#include <cassert>
 #include <string>
 #include <thread>
 #include <utility>
@@ -68,44 +69,44 @@ inline bool operator==(const ZenComponentHandle& lhs, const ZenComponentHandle& 
     return lhs.handle == rhs.handle;
 }
 
-namespace details
-{
-    template <typename T>
-    struct PropertyType
-    {};
-
-#ifdef OPENZEN_CXX17
-    template <> struct PropertyType<std::byte>
-#else
-    template <> struct PropertyType<unsigned char>
-#endif
-    {
-        using type = std::integral_constant<ZenPropertyType, ZenPropertyType_Byte>;
-    };
-
-    template <> struct PropertyType<bool>
-    {
-        using type = std::integral_constant<ZenPropertyType, ZenPropertyType_Bool>;
-    };
-
-    template <> struct PropertyType<float>
-    {
-        using type = std::integral_constant<ZenPropertyType, ZenPropertyType_Float>;
-    };
-
-    template <> struct PropertyType<int32_t>
-    {
-        using type = std::integral_constant<ZenPropertyType, ZenPropertyType_Int32>;
-    };
-
-    template <> struct PropertyType<uint64_t>
-    {
-        using type = std::integral_constant<ZenPropertyType, ZenPropertyType_UInt64>;
-    };
-}
-
 namespace zen
 {
+    namespace details
+    {
+        template <typename T>
+        struct PropertyType
+        {};
+
+#ifdef OPENZEN_CXX17
+        template <> struct PropertyType<std::byte>
+#else
+        template <> struct PropertyType<unsigned char>
+#endif
+        {
+            using type = std::integral_constant<ZenPropertyType, ZenPropertyType_Byte>;
+        };
+
+        template <> struct PropertyType<bool>
+        {
+            using type = std::integral_constant<ZenPropertyType, ZenPropertyType_Bool>;
+        };
+
+        template <> struct PropertyType<float>
+        {
+            using type = std::integral_constant<ZenPropertyType, ZenPropertyType_Float>;
+        };
+
+        template <> struct PropertyType<int32_t>
+        {
+            using type = std::integral_constant<ZenPropertyType, ZenPropertyType_Int32>;
+        };
+
+        template <> struct PropertyType<uint64_t>
+        {
+            using type = std::integral_constant<ZenPropertyType, ZenPropertyType_UInt64>;
+        };
+    }
+
     class ZenClient;
 
     /**
@@ -120,8 +121,6 @@ namespace zen
         ZenClientHandle_t m_clientHandle;
         ZenSensorHandle_t m_sensorHandle;
         ZenComponentHandle_t m_componentHandle;
-
-        static constexpr size_t m_getArrayBufferSize = 9;
 
     protected:
         ZenSensorComponent(ZenClientHandle_t clientHandle, ZenSensorHandle_t sensorHandle, ZenComponentHandle_t componentHandle) noexcept
@@ -183,16 +182,28 @@ namespace zen
         template <class TDataType>
         std::pair<ZenError, std::vector<TDataType>> getArrayProperty(ZenProperty_t property) noexcept
         {
-            std::vector<TDataType> outputArray(m_getArrayBufferSize);
+            constexpr size_t c_arrayPropertyBufferSize = 16;
+            std::vector<TDataType> outputArray(c_arrayPropertyBufferSize);
 
-            size_t outputSize = outputArray.size() * sizeof(TDataType);
+            size_t outputSizeBytes = outputArray.size() * sizeof(TDataType);
             auto error = ZenSensorComponentGetArrayProperty(m_clientHandle, m_sensorHandle, m_componentHandle,
                 property,
                 details::PropertyType<TDataType>::type::value,
-                outputArray.data(), &outputSize);
-            outputSize /= sizeof(TDataType);
+                outputArray.data(), &outputSizeBytes);
+            
             // resize output size
+            auto outputSize = outputSizeBytes / sizeof(TDataType);
             outputArray.resize(outputSize);
+
+            // if the array was too small to hold the results, try again to get the values with the resized array
+            if (error == ZenError_BufferTooSmall) {
+                error = ZenSensorComponentGetArrayProperty(m_clientHandle, m_sensorHandle, m_componentHandle,
+                    property,
+                    details::PropertyType<TDataType>::type::value,
+                    outputArray.data(), &outputSizeBytes);
+                assert(error != ZenError_BufferTooSmall);
+            }
+
             return {error, outputArray};
         }
 
@@ -312,8 +323,6 @@ namespace zen
         ZenClientHandle_t m_clientHandle;
         ZenSensorHandle_t m_sensorHandle;
 
-        static constexpr size_t m_getArrayBufferSize = 9;
-
     protected:
         ZenSensor(ZenClientHandle_t clientHandle, ZenSensorHandle_t sensorHandle)
             : m_clientHandle(clientHandle)
@@ -378,6 +387,11 @@ namespace zen
             return ZenSensorIoType(m_clientHandle, m_sensorHandle);
         }
 
+        std::string deviceName() const noexcept
+        {
+            return ZenSensorName(m_clientHandle, m_sensorHandle);
+        }
+
         /**
          * Compare if a sensor description matches the sensor
          * this instance points to
@@ -417,16 +431,28 @@ namespace zen
         template <class TDataType>
         std::pair<ZenError, std::vector<TDataType>> getArrayProperty(ZenProperty_t property) noexcept
         {
-            std::vector<TDataType> outputArray(m_getArrayBufferSize);
+            constexpr size_t c_arrayPropertyBufferSize = 22;
+            std::vector<TDataType> outputArray(c_arrayPropertyBufferSize);
 
-            size_t outputSize = outputArray.size() * sizeof(TDataType);
+            size_t outputSizeBytes = outputArray.size() * sizeof(TDataType);
             auto error = ZenSensorGetArrayProperty(m_clientHandle, m_sensorHandle,
                 property,
                 details::PropertyType<TDataType>::type::value,
-                outputArray.data(), &outputSize);
-            outputSize /= sizeof(TDataType);
+                outputArray.data(), &outputSizeBytes);
+            
             // resize output size
+            size_t outputSize = outputSizeBytes / sizeof(TDataType);
             outputArray.resize(outputSize);
+            
+            // if the array was too small to hold the results, try again to get the values with the resized array
+            if (error == ZenError_BufferTooSmall) {
+                error = ZenSensorGetArrayProperty(m_clientHandle, m_sensorHandle,
+                    property,
+                    details::PropertyType<TDataType>::type::value,
+                    outputArray.data(), &outputSizeBytes);
+                assert(error != ZenError_BufferTooSmall);
+            }
+
             return {error, outputArray};
         }
         /**
@@ -562,7 +588,7 @@ namespace zen
         {
             ZenComponentHandle_t* handles = nullptr;
             size_t nComponents;
-            if (auto error = ZenSensorComponents(m_clientHandle, m_sensorHandle, type.c_str(), &handles, &nComponents))
+            if (ZenSensorComponents(m_clientHandle, m_sensorHandle, type.c_str(), &handles, &nComponents) != ZenError_None)
                 return std::make_pair(false, ZenSensorComponent(m_clientHandle, m_sensorHandle, ZenComponentHandle_t{ 0 }));
 
             if (nComponents == 0)
@@ -677,6 +703,14 @@ namespace zen
          * will be empty.
          */
         std::optional<ZenEvent> pollNextEvent() noexcept
+        {
+            if (ZenEvent event; ZenPollNextEvent(m_handle, &event)) {
+                return event;
+            }
+            else {
+                return std::nullopt;
+            }
+        }
 #else
         /**
          * Poll the next event from the queue of this ZenClient. This method will
@@ -684,24 +718,16 @@ namespace zen
          * of the std::pair will be false.
          */
         std::pair<bool, ZenEvent> pollNextEvent() noexcept
-#endif
         {
             ZenEvent event;
-            if (ZenPollNextEvent(m_handle, &event))
-            {
-#ifdef OPENZEN_CXX17
-                return event;
-#else
+            if (ZenPollNextEvent(m_handle, &event)) {
                 return std::make_pair(true, std::move(event));
-#endif
             }
-
-#ifdef OPENZEN_CXX17
-            return std::nullopt;
-#else
-            return std::make_pair(false, std::move(event));
-#endif
+            else {
+                return std::make_pair(false, std::move(event));
+            }
         }
+#endif
 
 #ifdef OPENZEN_CXX17
         /**
@@ -713,6 +739,14 @@ namespace zen
          * will be empty.
          */
         std::optional<ZenEvent> waitForNextEvent() noexcept
+        {
+            if (ZenEvent event; ZenWaitForNextEvent(m_handle, &event)) {
+                return event;
+            }
+            else {
+                return std::nullopt;
+            }
+        }
 #else
         /**
          * Wait for the next event from the queue of this ZenClient. This method will
@@ -723,24 +757,16 @@ namespace zen
          * of the std::pair will be false.
          */
         std::pair<bool, ZenEvent> waitForNextEvent() noexcept
-#endif
         {
             ZenEvent event;
-            if (ZenWaitForNextEvent(m_handle, &event))
-            {
-#ifdef OPENZEN_CXX17
-                return event;
-#else
+            if (ZenWaitForNextEvent(m_handle, &event)) {
                 return std::make_pair(true, std::move(event));
-#endif
             }
-
-#ifdef OPENZEN_CXX17
-            return std::nullopt;
-#else
-            return std::make_pair(false, std::move(event));
-#endif
+            else {
+                return std::make_pair(false, std::move(event));
+            }
         }
+#endif
     };
 
     /**

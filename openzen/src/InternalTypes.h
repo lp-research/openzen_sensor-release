@@ -29,6 +29,8 @@ enum class EDevicePropertyInternal : DeviceProperty_t
     ConfigGpsOutputDataBitset = 5,
     // loading configuration of the output units for Ig1
     ConfigGetDegGradOutput = 6,
+    // loading configuration of the ouput precision
+    ConfigGetLpBusDataPrecision = 7,
     Max
 };
 
@@ -55,6 +57,9 @@ enum class EDevicePropertyV0 : DeviceProperty_t
     RestoreFactorySettings = 16,        // void
 
     SetOrientationOffsetMode = 18,      // uint32_t
+
+    SetImuId = 20,                      // uint32_t
+    GetImuId = 21,                      // uint32_t
 
     StartGyroCalibration = 22,          // void
     SetGyrUseAutoCalibration = 23,      // bool
@@ -100,6 +105,11 @@ enum class EDevicePropertyV0 : DeviceProperty_t
     GetMagBias = 80,                    // float[3]
     GetMagReference = 81,               // float[3]
     ResetOrientationOffset = 82,        // void
+
+    // not listed in LPMS documetation
+    // this is the value modified by the IMU in-situ gyro calibration
+    SetGyrStaticBias = 100,             // float[3]
+    GetGyrStaticBias = 101,             // float[3]
 
     SetBaudRate = 84,
     GetBaudRate = 85,
@@ -204,6 +214,7 @@ enum class EDevicePropertyV1 : DeviceProperty_t
     GetCanBaudRate = 113,               // uint32
     SetCanDataPrecision = 114,          // uint32
     GetCanDataPrecision = 115,          // uint32
+    SetCanMode = 116,                   // uint32
     GetCanMode = 117,                   // uint32
     SetCanMapping = 118,                // uint32
     GetCanMapping = 119,                // uint32

@@ -1,5 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
-project(OpenZen VERSION 1.0.0 LANGUAGES CXX;C)
+
+if (APPLE)
+# enable_language(OBJCXX) misidentifies .mm files as C++ when doing a Unity build,
+# so we have to use this if().
+project(OpenZen VERSION 1.0.0 LANGUAGES C;CXX;OBJCXX)
+else()
+project(OpenZen VERSION 1.0.0 LANGUAGES C;CXX)
+endif()
 
 option(ZEN_MSVC_RUNTIME_STATIC "Link the MSVC runtime statically, useful for library releases" OFF)
 
@@ -58,6 +65,7 @@ option(ZEN_USE_STATIC_LIBS "Whether to compile OpenZen as a static library" OFF)
 option(ZEN_STATIC_LINK_LIBCXX "Option to statically link libstdc++ to be portable to older systems (Linux only)" OFF)
 # linux needs libbluetooth-dev to be able to compile, so disable it by default
 option(ZEN_BLUETOOTH "Compile OpenZen with bluetooth support" ${ZEN_BLUETOOTH_DEFAULT})
+option(ZEN_PCAN "Compile OpenZen Peak CAN USB adapter support" OFF)
 option(ZEN_BLUETOOTH_BLE "Compile OpenZen with bluetooth low-energy support, needs Qt installed" OFF)
 option(ZEN_NETWORK "Compile OpenZen with support for network streaming of measurement data" OFF)
 option(ZEN_CSHARP "Compile C# bindings for OpenZen" ON)
@@ -76,20 +84,12 @@ option(ZEN_USE_BINARY_LIBRARIES "If set to true, binaries libraries are download
 # Find includes in corresponding build include_directories
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-if(ZEN_PYTHON)
-    # this is only available in cmake 3.12 or newer
-    # look and build only for python3
-    find_package (Python3 REQUIRED COMPONENTS Development Interpreter)
-    # let the pybind11 cmake scripts know which Python version
-    # we intdent to use
-    set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE} CACHE STRING "")
-endif()
-
 add_subdirectory(external)
 
 # contains additional C/C++ precompiler defines
 # which might be set depending on the selected compile options
 set(zen_optional_compile_definitions_private)
+set(zen_optional_compile_options)
 set(zen_optional_libs)
 
 # set the correct log level
@@ -109,7 +109,6 @@ endif()
 set(zen_includes
     include/OpenZen.h
     include/OpenZenCAPI.h
-    include/ZenProtocol.h
     include/ZenTypes.h
 )
 
@@ -141,7 +140,7 @@ if(ZEN_PYTHON)
     list (APPEND zen_library_only_sources
         src/bindings/OpenZenPython.cpp
     )
-    list (APPEND zen_optional_libs Python3::Python pybind11)
+    list (APPEND zen_optional_libs pybind11)
     # select C++17 if we do a Python build because the C++17 interface of OpenZen.h
     # is more convenient than the C++11 version
     list (APPEND zen_optional_compile_definitions_private
@@ -150,6 +149,12 @@ if(ZEN_PYTHON)
 endif()
 
 if(ZEN_CSHARP)
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit
+        set(SWIG_FLAGS "-DSWIGWORDSIZE64")
+    else() # 32-bit
+        set(SWIG_FLAGS "-DSWIGWORDSIZE32")
+    endif()
+
     list (APPEND zen_sources
         ## run
         # swig -csharp -small -c++ -debug-typedef -DSWIGWORDSIZE64 -o OpenZenCSharp/OpenZen_wrap_csharp.cxx -outdir OpenZenCSharp OpenZen.i
@@ -202,15 +207,7 @@ set(io_sources
     src/io/IoManager.h
 )
 
-set(io_can_sources
-    src/io/can/CanManager.cpp
-    src/io/can/CanManager.h
-    src/io/can/ICanChannel.h
-)
-
 set(io_interfaces_sources
-    src/io/interfaces/CanInterface.cpp
-    src/io/interfaces/CanInterface.h
     src/io/interfaces/TestSensorInterface.cpp
     src/io/interfaces/TestSensorInterface.h
 )
@@ -254,6 +251,19 @@ set(utility_sources
     src/utility/gnss/RTCM3SerialSource.cpp
     src/utility/gnss/RTCM3Parser.h
 )
+
+if(ZEN_PCAN)
+    set(io_can_sources
+        src/io/can/CanManager.cpp
+        src/io/can/CanManager.h
+        src/io/can/ICanChannel.h
+    )
+
+    set(io_interfaces_sources
+        src/io/interfaces/CanInterface.cpp
+        src/io/interfaces/CanInterface.h
+    )
+endif()
 
 if(ZEN_BLUETOOTH_BLE)
     set(io_ble_sources
@@ -408,10 +418,17 @@ if(WIN32)
 
     # add drivers which need binary libraries
     if (ZEN_USE_BINARY_LIBRARIES)
-        set(io_can_sources ${io_can_sources}
-            src/io/can/PcanBasicChannel.cpp
-            src/io/can/PcanBasicChannel.h
-        )
+        if(ZEN_PCAN)
+            list(APPEND io_can_sources
+                src/io/can/PcanBasicChannel.cpp
+                src/io/can/PcanBasicChannel.h
+            )
+
+            list (APPEND io_systems_sources
+                src/io/systems/PcanBasicSystem.cpp
+                src/io/systems/PcanBasicSystem.h
+            )
+        endif()
 
         list (APPEND io_interfaces_sources
             src/io/interfaces/SiUsbInterface.cpp
@@ -421,8 +438,6 @@ if(WIN32)
         )
 
         list (APPEND io_systems_sources
-            src/io/systems/PcanBasicSystem.cpp
-            src/io/systems/PcanBasicSystem.h
             src/io/systems/SiUsbSystem.cpp
             src/io/systems/SiUsbSystem.h
             src/io/systems/FtdiUsbSystem.cpp
@@ -497,6 +512,16 @@ else()
     # hide all non-exported symbols in the build
     set_target_properties(OpenZen PROPERTIES CXX_VISIBILITY_PRESET hidden)
     set_target_properties(OpenZen PROPERTIES VISIBILITY_INLINES_HIDDEN ON)
+
+    # ensure the symbols of static libraries are not visible in the final
+    # shared library. CMake does not take of this this !
+    # note: not needed for interface-only libraries
+    set_target_properties(spdlog PROPERTIES CXX_VISIBILITY_PRESET hidden)
+    set_target_properties(spdlog PROPERTIES VISIBILITY_INLINES_HIDDEN ON)
+
+    # this is not done for libzmq now, because it uses an old CMake policy
+    # which cannot be changed for subdirectories, so ZMQ symbols will be
+    # public (CMP0063)
 endif()
 
 target_compile_definitions(OpenZen
@@ -519,9 +544,8 @@ target_compile_features(OpenZen
 set_property(TARGET OpenZen PROPERTY CXX_EXTENSIONS FALSE)
 
 if (NOT MSVC)
-    target_compile_options(OpenZen
-        PRIVATE
-            -Wall -Wextra -pedantic
+    list (APPEND zen_optional_compile_options
+        -Wall -Wextra -pedantic
     )
 
     # add linker options to statically compile in libstdc++
@@ -533,6 +557,19 @@ if (NOT MSVC)
         )
     endif()
 endif()
+
+# manage compile options for the targets
+if (CMAKE_COMPILER_IS_GNUCC)
+    # this warning is unreliable accross GCC releases
+    # https://gcc.gnu.org/pipermail/gcc-bugs/2019-January/648130.html
+    list (APPEND zen_optional_compile_options
+        -Wno-redundant-move
+    )
+endif()
+
+target_compile_options(OpenZen
+    PRIVATE
+        ${zen_optional_compile_options})
 
 set(zen_include_dirs_public
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -608,6 +645,7 @@ if (ZEN_TESTS)
     src/test/ModbusTest.cpp
     src/test/communication/ConnectionNegotiatorTest.cpp
     src/test/components/GnssComponentTest.cpp
+    src/test/components/ImuIg1ComponentTest.cpp
     src/test/streaming/SerializationTest.cpp
     src/test/OpenZenTests.cpp)
 
@@ -635,6 +673,11 @@ if (ZEN_TESTS)
             ZEN_API_STATIC
             ${zen_optional_compile_definitions_private}
     )
+
+    target_compile_options(OpenZenTests
+        PRIVATE
+            ${zen_optional_compile_options})
+
 endif()
 
 if (ZEN_EXAMPLES)
@@ -646,7 +689,6 @@ endif()
 set_property(TARGET OpenZen PROPERTY PUBLIC_HEADER
     include/OpenZen.h
     include/OpenZenCAPI.h
-    include/ZenProtocol.h
     include/ZenTypes.h
 )
 

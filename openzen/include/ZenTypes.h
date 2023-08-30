@@ -174,24 +174,28 @@ typedef struct ZenImuData
     double timestamp;
 
     /// Calibrated accelerometer sensor data.
-    /// Unit: m/s^2
+    /// Unit: g
     float a[3];
 
-    /// Calibrated gyroscope sensor data.
+    /// Alignment+Bias Calibrated gyroscope sensor data.
     /// Unit: degree/s
-    float g[3];
+    float g1[3], g2[3];
+
+    /// Bias Calibrated gyroscope sensor data.
+    /// Unit: degree/s
+    float g1BiasCalib[3], g2BiasCalib[3];
 
     /// Calibrated magnetometer sensor data.
     /// Unit: micro Tesla
     float b[3];
 
     /// Raw accelerometer sensor data.
-    /// Unit: m/s^2
+    /// Unit: g
     float aRaw[3];
 
     /// Raw gyroscope sensor data.
     /// Unit: degree/s
-    float gRaw[3];
+    float g1Raw[3], g2Raw[3];
 
     /// Raw magnetometer sensor data.
     /// Unit: micro Tesla
@@ -201,6 +205,7 @@ typedef struct ZenImuData
     /// This angular velocity takes into account if an orientation offset
     /// has been set while the g and gRaw values in this struct
     /// do not.
+    /// Unit: degree/s
     float w[3];
 
     /// Euler angle data.
@@ -225,7 +230,7 @@ typedef struct ZenImuData
     float pressure;
 
     /// Linear acceleration x, y and z.
-    /// Unit: m/s^2
+    /// Unit: g
     float linAcc[3];
 
     /// Gyroscope temperature.
@@ -326,7 +331,7 @@ typedef struct ZenGnssData
     double headingOfMotion;
 
     /// Heading of Vehicle in degrees in clockwise counting
-    /// and 0 degree being north, only usable for Dead-reckoning GPS
+    /// and 0 degree being north, only usable for Dead-reckoning GPS.
     /// This heading is not changing if the vehicle drives backwards for
     /// example as it is aligned with the forward direction of the vehicle
     double headingOfVehicle;
@@ -506,7 +511,7 @@ typedef enum EZenSensorProperty
 typedef enum EZenImuProperty
 {
     ZenImuProperty_Invalid = 0,
-
+    
     ZenImuProperty_StreamData = 1000,           // bool
     ZenImuProperty_SamplingRate,                // int
     ZenImuProperty_SupportedSamplingRates,      // int[]
@@ -520,7 +525,7 @@ typedef enum EZenImuProperty
 
     ZenImuProperty_FieldRadius,                  // float
     ZenImuProperty_FilterMode,                   // int
-    ZenImuProperty_SupportedFilterModes,         // byte[]
+    ZenImuProperty_SupportedFilterModes,         // int[]
     ZenImuProperty_FilterPreset,                 // int (future: float acc_covar, mag_covar)
 
     ZenImuProperty_OrientationOffsetMode,        // int
@@ -532,6 +537,7 @@ typedef enum EZenImuProperty
 
     ZenImuProperty_GyrAlignment,                 // float[9]
     ZenImuProperty_GyrBias,                      // float[3]
+    ZenImuProperty_GyrStaticBias,                // float[3]
     ZenImuProperty_GyrRange,                     // int
     ZenImuProperty_GyrSupportedRanges,           // int[]
     ZenImuProperty_GyrUseAutoCalibration,        // bool
@@ -591,6 +597,9 @@ typedef enum EZenImuProperty
     ZenImuProperty_StartSensorSync,              // void - send start sensor sync command
     ZenImuProperty_StopSensorSync,               // void - send stop sensor sync command
 
+    /* Component properties */
+    ZenImuProperty_Id,
+
     ZenImuProperty_Max
 } EZenImuProperty;
 
@@ -644,6 +653,8 @@ typedef enum EZenGnssProperty
     ZenGnssProperty_OutputEsfStatusFusionMode,
     ZenGnssProperty_OutputEsfStatusNumSens,
     ZenGnssProperty_OutputEsfStatusSensStatus,
+
+    ZenGnssProperty_RtkCorrectionMessage,
 
     ZenGnssProperty_Max
 } EZenGnssProperty;
